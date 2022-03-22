@@ -18,6 +18,7 @@
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom"),
     Wreck = require("@hapi/wreck"),
+
     mapMoveOnChildren = (child) => ({
         lmsId: child.lmsId,
         pubId: child.id,
@@ -25,83 +26,81 @@ const { v4: uuidv4 } = require("uuid"),
         satisfied: (child.type === "au" && child.moveOn === "NotApplicable"),
         ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
     }),
-    isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+
+    //here are some modules to make the above smaller
+    nodeSatisfied = ((node) =>  {
         if (node.satisfied) {
             return true;
         }
+    }),
 
+    //here are some modules to make the above smaller
+    auNodeSatisfied = ((node) =>  {
         if (node.type === "au") {
             if (node.lmsId === auToSetSatisfied) {
                 node.satisfied = true;
             }
             return node.satisfied;
         }
+    }),
+
+    tryParseTemplate = ((satisfiedStTemplate) => {
+        try {
+            statement = JSON.parse(satisfiedStTemplate);
+        }
+        catch (ex) {
+            throw new Error(`Failed to parse statement template: ${ex}`);
+        }
+        
+        return statement;
+    }),
+    
+    assignStatementValues = ((statement) =>{
+        statement.id = uuidv4();
+        statement.timestamp = new Date().toISOString();
+        statement.object = {
+            id: node.lmsId,
+            definition: {
+                type: node.type === "block" ? "https://w3id.org/xapi/cmi5/activitytype/block" : "https://w3id.org/xapi/cmi5/activitytype/course"
+            }
+        };
+        statement.context.contextActivities.grouping = [
+            {
+                id: node.pubId
+            }
+        ];
+    }),
+    
+    isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+        
+        nodeSatisfied(node);
+
+        auNodeSatisfied(node);
 
         // recursively check all children to see if they are satisfied
         let allChildrenSatisfied = true;
 
-        for (const child of node.children) {
-            if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
-                allChildrenSatisfied = false;
-            }
-        }
+        loopThroughChildren();
 
         if (allChildrenSatisfied) {
             node.satisfied = true;
 
-            let statement;
+            let statement = tryParseTemplate();
+            assignStatementValues(statement);
+            
+            let satisfiedStResponse = retrieveSatisfiedResponse();
 
-            try {
-                statement = JSON.parse(satisfiedStTemplate);
-            }
-            catch (ex) {
-                throw new Error(`Failed to parse statement template: ${ex}`);
-            }
-
-            statement.id = uuidv4();
-            statement.timestamp = new Date().toISOString();
-            statement.object = {
-                id: node.lmsId,
-                definition: {
-                    type: node.type === "block" ? "https://w3id.org/xapi/cmi5/activitytype/block" : "https://w3id.org/xapi/cmi5/activitytype/course"
-                }
-            };
-            statement.context.contextActivities.grouping = [
-                {
-                    id: node.pubId
-                }
-            ];
-
-            let satisfiedStResponse,
-                satisfiedStResponseBody;
-
-            try {
-                satisfiedStResponse = await lrsWreck.request(
-                    "POST",
-                    "statements",
-                    {
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        payload: statement
-                    }
-                );
-
-                satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, {json: true});
-            }
-            catch (ex) {
-                throw new Error(`Failed request to store satisfied statement: ${ex}`);
-            }
-
-            if (satisfiedStResponse.statusCode !== 200) {
-                throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-            }
+            checkStatusCode();
 
             return true;
         }
 
         return false;
     };
+    ///end of massive isSatisified module
+
+
+
 let Registration;
 
 module.exports = Registration = {
@@ -319,5 +318,42 @@ module.exports = Registration = {
         }
 
         await isSatisfied(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate});
-    }
+    },
+
+    retrieveSatisfiedResponse: async () => {
+        try {
+            satisfiedStResponse = await lrsWreck.request(
+                "POST",
+                "statements",
+                {
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    payload: statement
+                }
+            );
+
+            satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, {json: true});
+            return satisfiedStResponse;
+        }
+        catch (ex) {
+            throw new Error(`Failed request to store satisfied statement: ${ex}`);
+        }
+
+    },
+
+    checkStatusCode: async(stResponse) => {
+        if (satisfiedStResponse.statusCode !== 200) {
+            throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
+        } 
+    },
+
+    loopThroughChildren: async() => {
+        for (const child of node.children) {
+            if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
+                allChildrenSatisfied = false;
+            }
+        }
+    },
 };
+
