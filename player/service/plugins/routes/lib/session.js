@@ -15,21 +15,11 @@
 */
 "use strict";
 
-///In repo, this is labeled as 'properly handle stringification of SQL params
+const Boom = require("@hapi/boom"), 
+    Wreck = require("@hapi/wreck"),   
+    { v4: uuidv4 } = require("uuid"); 
 
-const Boom = require("@hapi/boom"),  ///Boom provides utilities for returning HTTP errors
-    Wreck = require("@hapi/wreck"),   ///Wreck provides HTTP client utilities
-    { v4: uuidv4 } = require("uuid"); ///UUID is universally unique identifier
-const { createFalse } = require("typescript");
-
-let Session; ///Session is declared here. Let allows declaration of variables for block scope
-
-///Module.exports is used to export an item so other modules can use it. Here it appears to be exporting 
-///'Session' which is the entire nested functions below! These need to be broken up
-///From what I can tell, exports currently to (is IMPLEMENTED IN) "CATAPULT/playerservice/plugins/routes/v1/sessions"
-///sessions in above routes purpose "player: provide session detail API resource. Believe John MArtin
-///is working on this one"
-
+let Session; 
 
 module.exports = Session = {
     
@@ -40,7 +30,7 @@ module.exports = Session = {
                 throw new Error(`Failed to select session: ${ex}`);
         }
     },
-    ///Trey creat a getSession function here, which takes two params, cause dang tenantID is not called?
+
     getSession: async(sessionId, db) => {
         return await db
                         .first("*")
@@ -53,7 +43,6 @@ module.exports = Session = {
                 })
                 .queryContext({jsonCols: ["context_template"]});
     },
-    ///end load 
 
     loadForChange: async (txn, sessionId, tenantId) => {
         
@@ -113,16 +102,17 @@ module.exports = Session = {
     },
 
     abandon: async (sessionId, tenantId, by, {db, lrsWreck}) => {
-        const txn = await db.transaction();///used in all folling segments, keep here as more global
+        const txn = await db.transaction(); 
         const {
             session,
             regCourseAu,
             registration,
             courseAu
-        } = tryGetSessionInfo();
+        } = Session.tryGetSessionInfo();
+
         let stResponse;
         
-        if (determineSessionValid){
+        if (determineSessionValid(session)){
         
             durationSeconds = initializeDuration();
         };
@@ -131,18 +121,12 @@ module.exports = Session = {
         
         checkStatusCode(stResponse);
 
-        try {
-            await txn("sessions").update({is_abandoned: true, abandoned_by: by}).where({id: session.id, tenantId});
-        }
-        catch (ex) {
-            await txn.rollback();
-            throw Boom.internal(`Failed to update session: ${ex}`);
-        }
+        txnUpdate(txn);
 
         await txn.commit();
     },
 
-    tryGetSessionInfo: async () =>{
+    tryGetSessionInfo: async (txn, sessionId, tenantId) =>{
         try {   
             ({session,
             regCourseAu,
@@ -157,6 +141,7 @@ module.exports = Session = {
             throw Boom.internal(ex);
         }
     },
+
     initializeDuration: async =>{
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
@@ -190,8 +175,6 @@ module.exports = Session = {
         }
     },
     
-    
-
     retrieveResponse: async () => {
         try { stResponse = await lrsWreck.request(
             "POST",
@@ -247,11 +230,9 @@ checkStatusCode: async(stResponse) => {
         await txn.rollback();
         throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`));
     }
-
-
 },
 
-txnUpdate: async() => {
+txnUpdate: async(txn) => {
     try {
         await txn("sessions").update({is_abandoned: true, abandoned_by: by}).where({id: session.id, tenantId});
     }
@@ -260,6 +241,5 @@ txnUpdate: async() => {
         throw Boom.internal(`Failed to update session: ${ex}`);
     }
 }
-
     
 };

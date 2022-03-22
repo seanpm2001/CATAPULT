@@ -1,0 +1,28 @@
+{
+  "name": "catapult",
+  "version": "1.0.0",
+  "description": "This repository contains the artifacts of ADL's Project CATAPULT. The resources here are intended to increase the adoption of [cmi5](https://github.com/AICC/CMI-5_Spec_Current) by providing resources and tools needed by developers, instructional designers, and procurement personnel.",
+  "main": ".eslintrc.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {
+    "chai": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^4.6.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adlnet/CATAPULT.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/adlnet/CATAPULT/issues"
+  },
+  "homepage": "https://github.com/adlnet/CATAPULT#readme"
+}
