@@ -33,15 +33,15 @@ module.exports = Session = {
 
     getSession: async(sessionId, db) => {
         return await db
-                        .first("*")
-                        .from("sessions")
-                        .where(builder => {
-                            builder
-                                    .where("sessions.id", sessionId)
-                                    .orWhere("sessions.code", sessionId.toString()
-                                );
-                })
-                .queryContext({jsonCols: ["context_template"]});
+            .first("*")
+            .from("sessions")
+            .where(builder => {
+                builder
+                        .where("sessions.id", sessionId)
+                        .orWhere("sessions.code", sessionId.toString()
+                    );
+            })
+            .queryContext({jsonCols: ["context_template"]});
     },
 
     loadForChange: async (txn, sessionId, tenantId) => {
@@ -77,28 +77,28 @@ module.exports = Session = {
 
     getQueryResult: async() => {
         return await txn
-        .first("*")
-        .from("sessions")
-        .leftJoin("registrations_courses_aus", "sessions.registrations_courses_aus_id", "registrations_courses_aus.id")
-        .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
-        .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
-        .where({"sessions.tenant_id": tenantId})
-        .andWhere( finder => {
-            finder
-                .where("sessions.id", sessionId)
-                .orWhere("sessions.code", sessionId.toString());
-                })
-        .queryContext({jsonCols: [
+            .first("*")
+            .from("sessions")
+            .leftJoin("registrations_courses_aus", "sessions.registrations_courses_aus_id", "registrations_courses_aus.id")
+            .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
+            .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
+            .where({"sessions.tenant_id": tenantId})
+            .andWhere( finder => {
+                finder
+                    .where("sessions.id", sessionId)
+                    .orWhere("sessions.code", sessionId.toString());
+                    })
+            .queryContext({
+                jsonCols: [
                     "registrations_courses_aus.metadata",
                     "registrations.actor",
                     "registrations.metadata",
                     "courses_aus.metadata",
                     "sessions.context_template"
-                    ]
-        })
-        .forUpdate()
-        .options({nestTables: true});
-
+                ]
+            })
+            .forUpdate()
+            .options({nestTables: true});
     },
 
     abandon: async (sessionId, tenantId, by, {db, lrsWreck}) => {
@@ -128,13 +128,7 @@ module.exports = Session = {
 
     tryGetSessionInfo: async (txn, sessionId, tenantId) =>{
         try {   
-            ({session,
-            regCourseAu,
-            registration,
-            courseAu
-        } = await Session.loadForChange(txn, sessionId, tenantId));
-            return Session;
-        
+            return await Session.loadForChange(txn, sessionId, tenantId);        
         }
         catch (ex) {
             await txn.rollback();
