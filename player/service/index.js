@@ -33,11 +33,13 @@ const Hapi = require("@hapi/hapi"),
         API_SECRET
     } = process.env;
 
+
 const provision = async () => {
     const server = Hapi.server(
             {
                 host: process.argv[3],
                 port: process.argv[2] || 3398,
+                
                 routes: {
                     cors: true,
                     response: {
@@ -232,6 +234,7 @@ const provision = async () => {
     process.on("SIGTERM", sigHandler);
 
     console.log("Catapult player service running on %s", server.info.uri);
+    
 };
 
 process.on(
