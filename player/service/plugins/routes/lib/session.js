@@ -46,7 +46,7 @@ module.exports = Session = {
 
     loadForChange: async (txn, sessionId, tenantId) => {
         
-        let queryResult = Session.tryGetQueryResult(txn, sessionId, tenantId);
+        let queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
         
         if (! queryResult) {
             await txn.rollback();
@@ -60,14 +60,18 @@ module.exports = Session = {
             coursesAus: courseAu
         } = queryResult;
 
+       // console.log(courseAu);
+       // console.log("In loadForChange session is ", session);
+        //this seems to be what is causing the trouble, here it doesn't know what to do
         regCourseAu.courseAu = courseAu;
-
+       // console.log("In loadForChange adter 'courseAu' assignment session is ", session);
         return {session, regCourseAu, registration, courseAu};
     },
 
     tryGetQueryResult: async(txn, sessionId, tenantId) => { 
         try {
             return await Session.getQueryResult(txn, sessionId, tenantId);
+            
         }
         catch (ex) {
             await txn.rollback();
@@ -75,7 +79,7 @@ module.exports = Session = {
         }
     },
 
-    getQueryResult: async() => {
+    getQueryResult: async(txn, sessionId, tenantId) => {
         return await txn
             .first("*")
             .from("sessions")
@@ -103,25 +107,64 @@ module.exports = Session = {
 
     abandon: async (sessionId, tenantId, by, {db, lrsWreck}) => {
         const txn = await db.transaction(); 
-        const {
-            session,
+        
+        let session,
             regCourseAu,
             registration,
-            courseAu
-        } = Session.tryGetSessionInfo();
+            courseAu;
 
-        let stResponse;
-        
-        if (determineSessionValid(session)){
-        
-            durationSeconds = initializeDuration();
-        };
+       // console.log("In abandon, right at begining session is :", session)
+        try {
+            ({
+                session,
+                regCourseAu,
+                registration,
+                courseAu
+            } = await Session.loadForChange(txn, sessionId, tenantId));
+        }
+        catch (ex) {
+            await txn.rollback();
+            throw Boom.internal(ex);
+        }
 
-        stResponse = retrieveResponse();
-        
-        checkStatusCode(stResponse);
+        let stResponse,
+            stResponseBody;
 
-        txnUpdate(txn);
+       // console.log("In abandon session is ", session);
+        
+        if (session.is_terminated) {
+            //
+            // it's possible that a session gets terminated in between the time
+            // that the check for open sessions occurs and getting here to
+            // abandon it, but in the case that a terminated happens in that time
+            // then there is no reason to abandon the session so just return
+            //
+            await txn.rollback();
+
+            return;
+        }
+        if (session.is_abandoned) {
+            //
+            // shouldn't be possible to get here, but if it were to occur there
+            // isn't really a reason to error, better to just return and it is
+            // expected that more than one abandoned would not be recorded
+            //
+            await txn.rollback();
+
+            return;
+        }
+
+        
+        let durationSeconds = Session.initializeDuration(session);
+        
+
+        stResponse = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
+        
+       // console.log("after func checkStatusCode stResponse is ", stResponse);
+
+        await Session.checkStatusCode(txn, stResponse, stResponseBody);
+    
+        Session.txnUpdate(txn, by);
 
         await txn.commit();
     },
@@ -136,7 +179,8 @@ module.exports = Session = {
         }
     },
 
-    initializeDuration: async =>{
+    initializeDuration(session) {
+        let durationSeconds
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
         }
@@ -169,7 +213,10 @@ module.exports = Session = {
         }
     },
     
-    retrieveResponse: async () => {
+    retrieveResponse: async (durationSeconds, session, regCourseAu, registration, lrsWreck, txn) => {
+        let stResponse,
+            stResponseBody
+
         try { stResponse = await lrsWreck.request(
             "POST",
             "statements",
@@ -211,22 +258,27 @@ module.exports = Session = {
         ),
 
         stResponseBody = await Wreck.read(stResponse, {json: true})
-        return stResponse;
+        //console.log("In func retrieveResponse stResponse id ", stResponse);
+
+        return [stResponse, stResponseBody];
         
-        } catch{
-        await txn.rollback();
-        throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`));
-    }
+        } catch (ex) {
+            await txn.rollback();
+            throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`));
+        }
 
     },
-checkStatusCode: async(stResponse) => {
+
+checkStatusCode: async(txn, stResponse, stResponseBody) => {
+   // console.log("In func checkStatusCode stResponse id ", stResponse);
+
     if (stResponse.statusCode !== 200) {
         await txn.rollback();
         throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`));
     }
 },
 
-txnUpdate: async(txn) => {
+txnUpdate: async(txn, by) => {
     try {
         await txn("sessions").update({is_abandoned: true, abandoned_by: by}).where({id: session.id, tenantId});
     }

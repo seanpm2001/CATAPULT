@@ -21,4 +21,6 @@ fi
 # legacy-watch is used because it improves auto restart in our specific
 # use case for development, mounted volume in container, see "Application
 # isn't restarting" in the docs
-exec nodemon --legacy-watch --watch index.js --watch knexfile.js --watch lib --watch plugins index.js
+#exec nodemon --legacy-watch --watch index.js --watch knexfile.js --watch lib --watch plugins index.js
+exec node index.js
+
