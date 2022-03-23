@@ -16,49 +16,54 @@
 "use strict";
 
 const Boom = require("@hapi/boom"),
-    Wreck = require("@hapi/wreck"),
-    Session = require("../lib/session");
+  Wreck = require("@hapi/wreck"),
+  Session = require("../lib/session");
+
+async function handleSession(req, h, args) {
+  var sessionId = req.params.id;
+  var tenantId = req.auth.credentials.tenantId;
+  var db = req.server.app.db;
+
+  if (args.doAbandon) {
+    var lrsWreck = Wreck.defaults(
+      await req.server.methods.lrsWreckDefaults(req)
+    );
+
+    await Session.abandon(sessionId, tenantId, "api", { db, lrsWreck });
+
+    return null;
+  }
+
+  var result = await Session.load(sessionId, tenantId, { db });
+
+  if (!result) {
+    return Boom.notFound();
+  }
+
+  return result;
+}
 
 module.exports = {
-    name: "catapult-player-api-routes-v1-sessions",
-    register: (server, options) => {
-        server.route(
-            [
-                {
-                    method: "GET",
-                    path: "/session/{id}",
-                    options: {
-                        tags: ["api"]
-                    },
-                    handler: async (req, h) => {
-                        const result = await Session.load(req.params.id, req.auth.credentials.tenantId, {db: req.server.app.db});
+  name: "catapult-player-api-routes-v1-sessions",
+  register: (server, options) => {
+    server.route([
+      {
+        method: "GET",
+        path: "/session/{id}",
+        options: {
+          tags: ["api"],
+        },
+        handler: handleSession(req, h),
+      },
 
-                        if (! result) {
-                            return Boom.notFound();
-                        }
-
-                        return result;
-                    }
-                },
-
-                {
-                    method: "POST",
-                    path: "/session/{id}/abandon",
-                    options: {
-                        tags: ["api"]
-                    },
-                    handler: async (req, h) => {
-                        const sessionId = req.params.id,
-                            tenantId = req.auth.credentials.tenantId,
-                            db = req.server.app.db,
-                            lrsWreck = Wreck.defaults(await req.server.methods.lrsWreckDefaults(req));
-
-                        await Session.abandon(sessionId, tenantId, "api", {db, lrsWreck});
-
-                        return null;
-                    }
-                }
-            ]
-        );
-    }
+      {
+        method: "POST",
+        path: "/session/{id}/abandon",
+        options: {
+          tags: ["api"],
+        },
+        handler: handleSession(req, h, { doAbandon: true }),
+      },
+    ]);
+  },
 };
