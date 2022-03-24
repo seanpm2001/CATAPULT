@@ -158,7 +158,7 @@ module.exports = Session = {
         let durationSeconds = Session.initializeDuration(session);
         
 
-        stResponse = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
+        [stResponse, stResponseBody] = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
         
        // console.log("after func checkStatusCode stResponse is ", stResponse);
 

@@ -22,6 +22,32 @@ const { v4: uuidv4 } = require("uuid"),
         satisfied: (child.type === "au" && child.moveOn === "NotApplicable"),
         ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
     }),
+    tryParseTemplate = ((satisfiedStTemplate) => {
+        try {
+            statement = JSON.parse(satisfiedStTemplate);
+        }
+        catch (ex) {
+            throw new Error(`Failed to parse statement template: ${ex}`);
+        }
+        
+        return statement;
+    }),
+
+    assignStatementValues = ((statement) =>{
+        statement.id = uuidv4();
+        statement.timestamp = new Date().toISOString();
+        statement.object = {
+            id: node.lmsId,
+            definition: {
+                type: node.type === "block" ? "https://w3id.org/xapi/cmi5/activitytype/block" : "https://w3id.org/xapi/cmi5/activitytype/course"
+            }
+        };
+        statement.context.contextActivities.grouping = [
+            {
+                id: node.pubId
+            }
+        ];
+    }),
     isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
         if (node.satisfied) {
             return true;
@@ -48,26 +74,9 @@ const { v4: uuidv4 } = require("uuid"),
 
             let statement;
 
-            try {
-                statement = JSON.parse(satisfiedStTemplate);
-            }
-            catch (ex) {
-                throw new Error(`Failed to parse statement template: ${ex}`);
-            }
+            statement = tryParseTemplate(satisfiedStTemplate);
 
-            statement.id = uuidv4();
-            statement.timestamp = new Date().toISOString();
-            statement.object = {
-                id: node.lmsId,
-                definition: {
-                    type: node.type === "block" ? "https://w3id.org/xapi/cmi5/activitytype/block" : "https://w3id.org/xapi/cmi5/activitytype/course"
-                }
-            };
-            statement.context.contextActivities.grouping = [
-                {
-                    id: node.pubId
-                }
-            ];
+            assignStatementValues(statement);
 
             let satisfiedStResponse,
                 satisfiedStResponseBody;
@@ -108,8 +117,8 @@ module.exports = Registration = {
         try {
             await db.transaction(
                 async (txn) => {
-                    const course = await txn.first("*").from("courses").queryContext({jsonCols: ["metadata", "structure"]}).where({tenantId, id: courseId}),
-                        courseAUs = await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId}),
+                    const course = await Registration.getCourse(txn, tenantId, courseId),
+                        courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
                         registration = {
                             tenantId,
                             code,
@@ -176,47 +185,26 @@ module.exports = Registration = {
 
         return registrationId;
     },
-
+    ///lets try these to help with cluster of function makings constants
+    getCourse:async(txn, tenantId, courseId) => {
+        return await txn.first("*").from("courses").queryContext({jsonCols: ["metadata", "structure"]}).where({tenantId, id: courseId});
+    },
+    getCourseAUs:async(txn, tenantId, courseId) => {
+        return await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId});
+    },
+    ///end create func, creaitng registration, or specifically registratioId, it looks like
     load: async ({tenantId, registrationId}, {db, loadAus = true}) => {
         let registration;
 
         try {
-            registration = await db
-                .first("*")
-                .queryContext({jsonCols: ["actor", "metadata"]})
-                .from("registrations")
-                .where(
-                    {
-                        tenantId
-                    }
-                ).andWhere(
-                    function () {
-                        this.where("id", registrationId).orWhere("code", registrationId.toString());
-                    }
-                );
-        }
-        catch (ex) {
+            registration = await Registration.loadRegistration(tenantId, registrationId, db);
+        }catch (ex) {
             throw new Error(`Failed to load registration: ${ex}`);
         }
 
         if (loadAus) {
             try {
-                registration.aus = await db
-                    .select(
-                        "has_been_attempted",
-                        "duration_normal",
-                        "duration_browse",
-                        "duration_review",
-                        "is_passed",
-                        "is_completed",
-                        "is_waived",
-                        "waived_reason",
-                        "is_satisfied",
-                        "metadata"
-                    )
-                    .from("registrations_courses_aus")
-                    .where({tenantId, registrationId: registration.id})
-                    .queryContext({jsonCols: ["metadata"]});
+                registration.aus = await Registration.loadRegistrationAus(db, tenantId, registrationId, registration);
             }
             catch (ex) {
                 throw new Error(`Failed to load registration AUs: ${ex}`);
@@ -225,37 +213,47 @@ module.exports = Registration = {
 
         return registration;
     },
-
+    ///To help above
+    loadRegistration: async(tenantId, registrationId, db) => {
+        await db
+        .first("*")
+        .queryContext({jsonCols: ["actor", "metadata"]})
+        .from("registrations")
+        .where(
+            {
+                tenantId
+            }
+        ).andWhere(
+            function () {
+                this.where("id", registrationId).orWhere("code", registrationId.toString());
+            }
+        );
+    },
+    ///Above
+    loadRegistrationAus: async(db, tenantId, registrationId, registration) =>{
+        await db
+        .select(
+            "has_been_attempted",
+            "duration_normal",
+            "duration_browse",
+            "duration_review",
+            "is_passed",
+            "is_completed",
+            "is_waived",
+            "waived_reason",
+            "is_satisfied",
+            "metadata"
+        )
+        .from("registrations_courses_aus")
+        .where({tenantId, registrationId: registration.id})
+        .queryContext({jsonCols: ["metadata"]});
+    },
+    ////////////////
     loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
         let queryResult;
 
         try {
-            queryResult = await txn
-                .first("*")
-                .from("registrations_courses_aus")
-                .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
-                .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
-                .where(
-                    {
-                        "registrations_courses_aus.tenant_id": tenantId,
-                        "courses_aus.au_index": auIndex
-                    }
-                )
-                .andWhere(function () {
-                    this.where("registrations.id", registrationId).orWhere("registrations.code", registrationId.toString());
-                })
-                .queryContext(
-                    {
-                        jsonCols: [
-                            "registrations_courses_aus.metadata",
-                            "registrations.actor",
-                            "registrations.metadata",
-                            "courses_aus.metadata"
-                        ]
-                    }
-                )
-                .forUpdate()
-                .options({nestTables: true})
+            queryResult = Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
         }
         catch (ex) {
             await txn.rollback();
@@ -277,6 +275,36 @@ module.exports = Registration = {
 
         return {regCourseAu, registration, courseAu};
     },
+    //forr above, exceedingly like session.js but trying less wrapping first to deal with issues
+    getQueryResult: async(txn, registrationId, auIndex, tenantId) =>{
+        return await txn
+        .first("*")
+        .from("registrations_courses_aus")
+        .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
+        .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
+        .where(
+            {
+                "registrations_courses_aus.tenant_id": tenantId,
+                "courses_aus.au_index": auIndex
+            }
+        )
+        .andWhere(function () {
+            this.where("registrations.id", registrationId).orWhere("registrations.code", registrationId.toString());
+        })
+        .queryContext(
+            {
+                jsonCols: [
+                    "registrations_courses_aus.metadata",
+                    "registrations.actor",
+                    "registrations.metadata",
+                    "courses_aus.metadata"
+                ]
+            }
+        )
+        .forUpdate()
+        .options({nestTables: true})
+
+    },
 
     interpretMoveOn: async (registration, {auToSetSatisfied, sessionCode, lrsWreck}) => {
         const moveOn = registration.metadata.moveOn,
@@ -287,34 +315,40 @@ module.exports = Registration = {
             // for multiple satisfied statements in the case of blocks in a course
             // and nested blocks
             //
-            satisfiedStTemplate = JSON.stringify({
-                actor: registration.actor,
-                verb: {
-                    id: "https://w3id.org/xapi/adl/verbs/satisfied",
-                    display: {
-                        "en": "satisfied"
-                    }
-                },
-                context: {
-                    registration: registration.code,
-                    contextActivities: {
-                        category: [
-                            {
-                                id: "https://w3id.org/xapi/cmi5/context/categories/cmi5"
-                            }
-                        ],
-                        grouping: []
-                    },
-                    extensions: {
-                        "https://w3id.org/xapi/cmi5/context/extensions/sessionid": sessionCode
-                    }
-                }
-            });
+            satisfiedStTemplate = templateToString(registration);
 
         if (moveOn.satisfied) {
             return;
         }
 
         await isSatisfied(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate});
-    }
+    },
+
+    templateToString(registration) => {
+        let satisfiedStTemplate = JSON.stringify({
+            actor: registration.actor,
+            verb: {
+                id: "https://w3id.org/xapi/adl/verbs/satisfied",
+                display: {
+                    "en": "satisfied"
+                }
+            },
+            context: {
+                registration: registration.code,
+                contextActivities: {
+                    category: [
+                        {
+                            id: "https://w3id.org/xapi/cmi5/context/categories/cmi5"
+                        }
+                    ],
+                    grouping: []
+                },
+                extensions: {
+                    "https://w3id.org/xapi/cmi5/context/extensions/sessionid": sessionCode
+                }
+            }
+        });
+    
+        return satisfiedStTemplate;
+    },
 };
