@@ -23,6 +23,8 @@ const { v4: uuidv4 } = require("uuid"),
         ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
     }),
     tryParseTemplate = ((satisfiedStTemplate) => {
+        let statement
+
         try {
             statement = JSON.parse(satisfiedStTemplate);
         }
@@ -33,7 +35,7 @@ const { v4: uuidv4 } = require("uuid"),
         return statement;
     }),
 
-    assignStatementValues = ((statement) =>{
+    assignStatementValues = ((node, statement) =>{
         statement.id = uuidv4();
         statement.timestamp = new Date().toISOString();
         statement.object = {
@@ -76,7 +78,7 @@ const { v4: uuidv4 } = require("uuid"),
 
             statement = tryParseTemplate(satisfiedStTemplate);
 
-            assignStatementValues(statement);
+            assignStatementValues(node, statement);
 
             let satisfiedStResponse,
                 satisfiedStResponseBody;
@@ -195,27 +197,27 @@ module.exports = Registration = {
     ///end create func, creaitng registration, or specifically registratioId, it looks like
     load: async ({tenantId, registrationId}, {db, loadAus = true}) => {
         let registration;
-
+        ///changed below with loadRegistration
         try {
-            registration = await Registration.loadRegistration(tenantId, registrationId, db);
-        }catch (ex) {
+            registration = await Registration.loadRegistration({tenantId, registrationId}, {db});
+        }
+        catch (ex) {
             throw new Error(`Failed to load registration: ${ex}`);
         }
 
         if (loadAus) {
             try {
-                registration.aus = await Registration.loadRegistrationAus(db, tenantId, registrationId, registration);
+                registration.aus = await Registration.loadRegistrationAus({tenantId, registrationId}, {db}, registration);
             }
             catch (ex) {
                 throw new Error(`Failed to load registration AUs: ${ex}`);
             }
         }
-
         return registration;
     },
     ///To help above
-    loadRegistration: async(tenantId, registrationId, db) => {
-        await db
+    loadRegistration: async({tenantId, registrationId}, {db}) => {
+        return await db
         .first("*")
         .queryContext({jsonCols: ["actor", "metadata"]})
         .from("registrations")
@@ -230,8 +232,10 @@ module.exports = Registration = {
         );
     },
     ///Above
-    loadRegistrationAus: async(db, tenantId, registrationId, registration) =>{
-        await db
+    loadRegistrationAus: async({tenantId, registrationId}, {db}, registration) =>{
+        /////welll, lets see
+        //console.log("here in loadRegistrationAUs registration is: ", registration);
+        return await db
         .select(
             "has_been_attempted",
             "duration_normal",
@@ -253,8 +257,32 @@ module.exports = Registration = {
         let queryResult;
 
         try {
-            queryResult = Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
-        }
+            queryResult = await txn
+            .first("*")
+            .from("registrations_courses_aus")
+            .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
+            .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
+            .where(
+                {
+                    "registrations_courses_aus.tenant_id": tenantId,
+                    "courses_aus.au_index": auIndex
+                }
+            )
+            .andWhere(function () {
+                this.where("registrations.id", registrationId).orWhere("registrations.code", registrationId.toString());
+            })
+            .queryContext(
+                {
+                    jsonCols: [
+                        "registrations_courses_aus.metadata",
+                        "registrations.actor",
+                        "registrations.metadata",
+                        "courses_aus.metadata"
+                    ]
+                }
+            )
+            .forUpdate()
+            .options({nestTables: true})        }
         catch (ex) {
             await txn.rollback();
             throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`);
@@ -315,7 +343,7 @@ module.exports = Registration = {
             // for multiple satisfied statements in the case of blocks in a course
             // and nested blocks
             //
-            satisfiedStTemplate = templateToString(registration);
+            satisfiedStTemplate = Registration.templateToString(registration, sessionCode);
 
         if (moveOn.satisfied) {
             return;
@@ -324,7 +352,7 @@ module.exports = Registration = {
         await isSatisfied(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate});
     },
 
-    templateToString(registration) => {
+    templateToString(registration, sessionCode) {
         let satisfiedStTemplate = JSON.stringify({
             actor: registration.actor,
             verb: {

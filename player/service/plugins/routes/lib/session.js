@@ -164,7 +164,7 @@ module.exports = Session = {
 
         await Session.checkStatusCode(txn, stResponse, stResponseBody);
     
-        Session.txnUpdate(txn, by);
+        await Session.txnUpdate(session, tenantId, txn, by);
 
         await txn.commit();
     },
@@ -184,6 +184,7 @@ module.exports = Session = {
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
         }
+        return durationSeconds;////kinda needs a return stement sheikkkkkk
     },
 
     determineSessionValid: async (session) => {
@@ -270,7 +271,7 @@ module.exports = Session = {
     },
 
 checkStatusCode: async(txn, stResponse, stResponseBody) => {
-   // console.log("In func checkStatusCode stResponse id ", stResponse);
+    console.log("In func checkStatusCode stResponse is ", stResponse);
 
     if (stResponse.statusCode !== 200) {
         await txn.rollback();
@@ -278,7 +279,7 @@ checkStatusCode: async(txn, stResponse, stResponseBody) => {
     }
 },
 
-txnUpdate: async(txn, by) => {
+txnUpdate: async(session, tenantId, txn, by) => {
     try {
         await txn("sessions").update({is_abandoned: true, abandoned_by: by}).where({id: session.id, tenantId});
     }
