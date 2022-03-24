@@ -60,12 +60,9 @@ module.exports = Session = {
             coursesAus: courseAu
         } = queryResult;
 
-       // console.log(courseAu);
-       // console.log("In loadForChange session is ", session);
-        //this seems to be what is causing the trouble, here it doesn't know what to do
         regCourseAu.courseAu = courseAu;
-       // console.log("In loadForChange adter 'courseAu' assignment session is ", session);
-        return {session, regCourseAu, registration, courseAu};
+    
+       return {session, regCourseAu, registration, courseAu};
     },
 
     tryGetQueryResult: async(txn, sessionId, tenantId) => { 
@@ -113,14 +110,13 @@ module.exports = Session = {
             registration,
             courseAu;
 
-       // console.log("In abandon, right at begining session is :", session)
         try {
             ({
-                session,
-                regCourseAu,
-                registration,
-                courseAu
-            } = await Session.loadForChange(txn, sessionId, tenantId));
+            session,
+            regCourseAu,
+            registration,
+            courseAu
+            } = await Session.loadForChange(txn, sessionId, tenantId, courseAu));
         }
         catch (ex) {
             await txn.rollback();
@@ -130,37 +126,13 @@ module.exports = Session = {
         let stResponse,
             stResponseBody;
 
-       // console.log("In abandon session is ", session);
-        
-        if (session.is_terminated) {
-            //
-            // it's possible that a session gets terminated in between the time
-            // that the check for open sessions occurs and getting here to
-            // abandon it, but in the case that a terminated happens in that time
-            // then there is no reason to abandon the session so just return
-            //
-            await txn.rollback();
-
-            return;
-        }
-        if (session.is_abandoned) {
-            //
-            // shouldn't be possible to get here, but if it were to occur there
-            // isn't really a reason to error, better to just return and it is
-            // expected that more than one abandoned would not be recorded
-            //
-            await txn.rollback();
-
-            return;
-        }
-
+        Session.determineSessionTerminated(session, txn);
+        Session.determineSessionAbandoned(session, txn);
         
         let durationSeconds = Session.initializeDuration(session);
         
 
         [stResponse, stResponseBody] = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
-        
-       // console.log("after func checkStatusCode stResponse is ", stResponse);
 
         await Session.checkStatusCode(txn, stResponse, stResponseBody);
     
@@ -180,43 +152,44 @@ module.exports = Session = {
     },
 
     initializeDuration(session) {
-        let durationSeconds
+        let durationSeconds;
+
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
         }
-        return durationSeconds;////kinda needs a return stement sheikkkkkk
+        return durationSeconds;
     },
 
-    determineSessionValid: async (session) => {
-        switch(session) {
-          
-            case (session.is_terminated):
-                //
-                // it's possible that a session gets terminated in between the time
-                // that the check for open sessions occurs and getting here to
-                // abandon it, but in the case that a terminated happens in that time
-                // then there is no reason to abandon the session so just return
-                //
-                await txn.rollback();
-                return false;
-        
-            case (session.is_abandoned): 
-                //
-                // shouldn't be possible to get here, but if it were to occur there
-                // isn't really a reason to error, better to just return and it is
-                // expected that more than one abandoned would not be recorded
-                //
-                await txn.rollback();
-                return false;
-            default:
-                return true;
+    determineSessionTerminated: async (session, txn) => {
+        if (session.is_terminated) {
+            //
+            // it's possible that a session gets terminated in between the time
+            // that the check for open sessions occurs and getting here to
+            // abandon it, but in the case that a terminated happens in that time
+            // then there is no reason to abandon the session so just return
+            //
+            await txn.rollback();
 
+            return;
+        }
+    },
+    determineSessionAbandoned: async(session, txn) => { 
+        
+        if (session.is_abandoned) {
+            //
+            // shouldn't be possible to get here, but if it were to occur there
+            // isn't really a reason to error, better to just return and it is
+            // expected that more than one abandoned would not be recorded
+            //
+            await txn.rollback();
+
+            return;
         }
     },
     
     retrieveResponse: async (durationSeconds, session, regCourseAu, registration, lrsWreck, txn) => {
         let stResponse,
-            stResponseBody
+            stResponseBody;
 
         try { stResponse = await lrsWreck.request(
             "POST",
@@ -259,7 +232,6 @@ module.exports = Session = {
         ),
 
         stResponseBody = await Wreck.read(stResponse, {json: true})
-        //console.log("In func retrieveResponse stResponse id ", stResponse);
 
         return [stResponse, stResponseBody];
         
@@ -267,12 +239,9 @@ module.exports = Session = {
             await txn.rollback();
             throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`));
         }
-
     },
 
 checkStatusCode: async(txn, stResponse, stResponseBody) => {
-    console.log("In func checkStatusCode stResponse is ", stResponse);
-
     if (stResponse.statusCode !== 200) {
         await txn.rollback();
         throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`));
@@ -287,6 +256,6 @@ txnUpdate: async(session, tenantId, txn, by) => {
         await txn.rollback();
         throw Boom.internal(`Failed to update session: ${ex}`);
     }
-}
-    
+},
+
 };
