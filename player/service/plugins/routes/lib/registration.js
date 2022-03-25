@@ -201,13 +201,15 @@ module.exports = Registration = {
 
         return registrationId;
     },
-    ///lets try these to help with cluster of function makings constants
+    
     getCourse:async(txn, tenantId, courseId) => {
         return await txn.first("*").from("courses").queryContext({jsonCols: ["metadata", "structure"]}).where({tenantId, id: courseId});
     },
+    
     getCourseAUs:async(txn, tenantId, courseId) => {
         return await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId});
     },
+    
     getRegistration: async(course, {tenantId, courseId, actor, code})=>{
         let registration = {
             tenantId,
@@ -227,11 +229,61 @@ module.exports = Registration = {
         }
         return registration;
     },
+    
+    parseRegistrationData: async (registration, lrsWreck) =>{
+        try {
+            registration.actor = JSON.parse(registration.actor);
+            registration.metadata = JSON.parse(registration.metadata);
 
-    ///end create func, creaitng registration, or specifically registratioId, it looks like
+            await Registration.retrieveRegistrationDataAsString(registration, lrsWreck);
+        }
+        catch (ex) {
+            throw new Error(`Failed to interpret moveOn: ${ex}`);
+        }
+        return registration;
+
+    },
+
+    retrieveRegistrationDataAsString: async(registration, lrsWreck) => {
+        return await Registration.interpretMoveOn(
+            registration,
+            {
+                sessionCode: uuidv4(),
+                lrsWreck
+            }
+        );
+    },
+    
+    updateMetadata: async(txn, registration, tenantId) => {
+        try {
+            return await txn("registrations").update({metadata: JSON.stringify(registration.metadata)}).where({tenantId, id: registration.id});
+        }
+        catch (ex) {
+            throw new Error(`Failed to update registration metadata: ${ex}`);
+        }
+    },
+
+    updateCourseAUmap: async(txn, tenantId, registrationId, courseAUs) => {
+        //courseAUs = this.courseAUs;
+        return await txn("registrations_courses_aus").insert(
+            courseAUs.map(
+                (ca) => ({
+                    tenantId,
+                    registrationId,
+                    course_au_id: ca.id,
+                    metadata: JSON.stringify({
+                        version: 1,
+                        moveOn: ca.metadata.moveOn
+                    }),
+                    is_satisfied: ca.metadata.moveOn === "NotApplicable"
+                })
+            )
+        );
+    },
+
     load: async ({tenantId, registrationId}, {db, loadAus = true}) => {
         let registration;
-        ///changed below with loadRegistration
+        
         try {
             registration = await Registration.loadRegistration({tenantId, registrationId}, {db});
         }
@@ -249,7 +301,7 @@ module.exports = Registration = {
         }
         return registration;
     },
-    ///To help above
+
     loadRegistration: async({tenantId, registrationId}, {db}) => {
         return await db
         .first("*")
@@ -265,10 +317,8 @@ module.exports = Registration = {
             }
         );
     },
-    ///Above
+
     loadRegistrationAus: async({tenantId, registrationId}, {db}, registration) =>{
-        /////welll, lets see
-        //console.log("here in loadRegistrationAUs registration is: ", registration);
         return await db
         .select(
             "has_been_attempted",
@@ -286,7 +336,7 @@ module.exports = Registration = {
         .where({tenantId, registrationId: registration.id})
         .queryContext({jsonCols: ["metadata"]});
     },
-    ////////////////
+
     loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
         let queryResult;
 
@@ -312,7 +362,7 @@ module.exports = Registration = {
 
         return {regCourseAu, registration, courseAu};
     },
-    //forr above, exceedingly like session.js but trying less wrapping first to deal with issues
+
     getQueryResult: async(txn, registrationId, auIndex, tenantId) =>{
         return await txn
         .first("*")
@@ -387,56 +437,5 @@ module.exports = Registration = {
         });
     
         return satisfiedStTemplate;
-    },
-
-    retrieveRegistrationDataAsString: async(registration, lrsWreck) => {
-        return await Registration.interpretMoveOn(
-            registration,
-            {
-                sessionCode: uuidv4(),
-                lrsWreck
-            }
-        );
-    },
-
-    parseRegistrationData: async (registration, lrsWreck) =>{
-        try {
-            registration.actor = JSON.parse(registration.actor);
-            registration.metadata = JSON.parse(registration.metadata);
-
-            await Registration.retrieveRegistrationDataAsString(registration, lrsWreck);
-        }
-        catch (ex) {
-            throw new Error(`Failed to interpret moveOn: ${ex}`);
-        }
-        return registration;
-
-    },
-
-    updateMetadata: async(txn, registration, tenantId) => {
-        try {
-            return await txn("registrations").update({metadata: JSON.stringify(registration.metadata)}).where({tenantId, id: registration.id});
-        }
-        catch (ex) {
-            throw new Error(`Failed to update registration metadata: ${ex}`);
-        }
-    },
-
-    updateCourseAUmap: async(txn, tenantId, registrationId, courseAUs) => {
-        //courseAUs = this.courseAUs;
-        return await txn("registrations_courses_aus").insert(
-            courseAUs.map(
-                (ca) => ({
-                    tenantId,
-                    registrationId,
-                    course_au_id: ca.id,
-                    metadata: JSON.stringify({
-                        version: 1,
-                        moveOn: ca.metadata.moveOn
-                    }),
-                    is_satisfied: ca.metadata.moveOn === "NotApplicable"
-                })
-            )
-        );
     },
 };
