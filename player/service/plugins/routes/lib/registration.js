@@ -12,9 +12,12 @@
 */
 "use strict";
 
+const lrs = require("../lrs");
+
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom"),
     Wreck = require("@hapi/wreck"),
+    
     mapMoveOnChildren = (child) => ({
         lmsId: child.lmsId,
         pubId: child.id,
@@ -22,8 +25,9 @@ const { v4: uuidv4 } = require("uuid"),
         satisfied: (child.type === "au" && child.moveOn === "NotApplicable"),
         ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
     }),
+    
     tryParseTemplate = ((satisfiedStTemplate) => {
-        let statement
+        let statement;
 
         try {
             statement = JSON.parse(satisfiedStTemplate);
@@ -50,26 +54,104 @@ const { v4: uuidv4 } = require("uuid"),
             }
         ];
     }),
-    isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+
+    nodeSatisfied = async(node) =>  {
         if (node.satisfied) {
             return true;
         }
+    },
 
+    AUnodeSatisfied = async(node, {auToSetSatisfied}) =>{
         if (node.type === "au") {
             if (node.lmsId === auToSetSatisfied) {
                 node.satisfied = true;
             }
-            return node.satisfied;
+            return await node.satisfied;
         }
+    },
 
-        // recursively check all children to see if they are satisfied
-        let allChildrenSatisfied = true;
-
+    loopThroughChildren = async(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
         for (const child of node.children) {
             if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
                 allChildrenSatisfied = false;
             }
         }
+        return allChildrenSatisfied;
+    },
+
+    retrieveResponse = async (lrsWreck, txn) => {
+        let satisfiedStResponse,
+            satisfiedStResponseBody;
+
+        try { satisfiedStResponse = await lrsWreck.request(
+            "POST",
+            "statements",
+            {
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                payload: {
+                    id: uuidv4(),
+                    timestamp: new Date().toISOString(),
+                    actor: registration.actor,
+                    verb: {
+                        id: "https://w3id.org/xapi/adl/verbs/abandoned",
+                        display: {
+                            en: "abandoned"
+                        }
+                    },
+                    object: {
+                        id: regCourseAu.courseAu.lms_id
+                    },
+                    result: {
+                        duration: `PT${durationSeconds}S`
+                    },
+                    context: {
+                        registration: registration.code,
+                        extensions: {
+                            "https://w3id.org/xapi/cmi5/context/extensions/sessionid": session.code
+                        },
+                        contextActivities: {
+                            category: [
+                                {
+                                    id: "https://w3id.org/xapi/cmi5/context/categories/cmi5"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ),
+
+        satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, {json: true})
+
+        return [satisfiedStResponse, satisfiedStResponseBody];
+        
+        } catch (ex) {
+            await txn.rollback();
+            throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`));
+        }
+    },
+
+    checkStatusCode= async(satisfiedStResponse, satisfiedStResponseBody) => {
+        if (satisfiedStResponse.statusCode !== 200) {
+            throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
+        }
+    },
+
+    isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+        
+        await nodeSatisfied(node);
+
+        if (AUnodeSatisfied(node, {auToSetSatisfied})) {
+            node.satisfied = true;
+            return node.satisfied;
+        }
+        
+        // recursively check all children to see if they are satisfied
+        let allChildrenSatisfied = true;
+
+        loopThroughChildren(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
 
         if (allChildrenSatisfied) {
             node.satisfied = true;
@@ -80,36 +162,15 @@ const { v4: uuidv4 } = require("uuid"),
 
             assignStatementValues(node, statement);
 
-            let satisfiedStResponse,
-                satisfiedStResponseBody;
+            let [satisfiedStResponse, satisfiedStResponseBody] = await retrieveResponse(lrsWreck, txn);
 
-            try {
-                satisfiedStResponse = await lrsWreck.request(
-                    "POST",
-                    "statements",
-                    {
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        payload: statement
-                    }
-                );
-
-                satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, {json: true});
-            }
-            catch (ex) {
-                throw new Error(`Failed request to store satisfied statement: ${ex}`);
-            }
-
-            if (satisfiedStResponse.statusCode !== 200) {
-                throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-            }
+            await checkStatusCode(satisfiedStResponse, satisfiedStResponseBody);
 
             return true;
         }
-
         return false;
     };
+    
 let Registration;
 
 module.exports = Registration = {
@@ -121,63 +182,16 @@ module.exports = Registration = {
                 async (txn) => {
                     const course = await Registration.getCourse(txn, tenantId, courseId),
                         courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
-                        registration = {
-                            tenantId,
-                            code,
-                            courseId,
-                            actor: JSON.stringify(actor),
-                            metadata: JSON.stringify({
-                                version: 1,
-                                moveOn: {
-                                    type: "course",
-                                    lmsId: course.lmsId,
-                                    pubId: course.structure.course.id,
-                                    satisfied: false,
-                                    children: course.structure.course.children.map(mapMoveOnChildren)
-                                }
-                            })
-                        },
+                        registration = await Registration.getRegistration(course, {tenantId, courseId, actor, code}),
                         regResult = await txn("registrations").insert(registration);
 
                     registrationId = registration.id = regResult[0];
 
-                    await txn("registrations_courses_aus").insert(
-                        courseAUs.map(
-                            (ca) => ({
-                                tenantId,
-                                registrationId,
-                                course_au_id: ca.id,
-                                metadata: JSON.stringify({
-                                    version: 1,
-                                    moveOn: ca.metadata.moveOn
-                                }),
-                                is_satisfied: ca.metadata.moveOn === "NotApplicable"
-                            })
-                        )
-                    );
+                    await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
 
-                    try {
-                        registration.actor = JSON.parse(registration.actor);
-                        registration.metadata = JSON.parse(registration.metadata);
-
-                        await Registration.interpretMoveOn(
-                            registration,
-                            {
-                                sessionCode: uuidv4(),
-                                lrsWreck
-                            }
-                        );
-                    }
-                    catch (ex) {
-                        throw new Error(`Failed to interpret moveOn: ${ex}`);
-                    }
-
-                    try {
-                        await txn("registrations").update({metadata: JSON.stringify(registration.metadata)}).where({tenantId, id: registration.id});
-                    }
-                    catch (ex) {
-                        throw new Error(`Failed to update registration metadata: ${ex}`);
-                    }
+                    await Registration.parseRegistrationData(registration, lrsWreck);
+                    
+                    await Registration.updateMetadata(txn, registration, tenantId);
                 }
             );
         }
@@ -194,6 +208,26 @@ module.exports = Registration = {
     getCourseAUs:async(txn, tenantId, courseId) => {
         return await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId});
     },
+    getRegistration: async(course, {tenantId, courseId, actor, code})=>{
+        let registration = {
+            tenantId,
+            code,
+            courseId,
+            actor: JSON.stringify(actor),
+            metadata: JSON.stringify({
+                version: 1,
+                moveOn: {
+                    type: "course",
+                    lmsId: course.lmsId,
+                    pubId: course.structure.course.id,
+                    satisfied: false,
+                    children: course.structure.course.children.map(mapMoveOnChildren)
+                }
+            })
+        }
+        return registration;
+    },
+
     ///end create func, creaitng registration, or specifically registratioId, it looks like
     load: async ({tenantId, registrationId}, {db, loadAus = true}) => {
         let registration;
@@ -257,33 +291,8 @@ module.exports = Registration = {
         let queryResult;
 
         try {
-            queryResult = await txn
-            .first("*")
-            .from("registrations_courses_aus")
-            .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
-            .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
-            .where(
-                {
-                    "registrations_courses_aus.tenant_id": tenantId,
-                    "courses_aus.au_index": auIndex
-                }
-            )
-            .andWhere(function () {
-                this.where("registrations.id", registrationId).orWhere("registrations.code", registrationId.toString());
-            })
-            .queryContext(
-                {
-                    jsonCols: [
-                        "registrations_courses_aus.metadata",
-                        "registrations.actor",
-                        "registrations.metadata",
-                        "courses_aus.metadata"
-                    ]
-                }
-            )
-            .forUpdate()
-            .options({nestTables: true})        }
-        catch (ex) {
+            queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
+        }catch (ex) {
             await txn.rollback();
             throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`);
         }
@@ -378,5 +387,56 @@ module.exports = Registration = {
         });
     
         return satisfiedStTemplate;
+    },
+
+    retrieveRegistrationDataAsString: async(registration, lrsWreck) => {
+        return await Registration.interpretMoveOn(
+            registration,
+            {
+                sessionCode: uuidv4(),
+                lrsWreck
+            }
+        );
+    },
+
+    parseRegistrationData: async (registration, lrsWreck) =>{
+        try {
+            registration.actor = JSON.parse(registration.actor);
+            registration.metadata = JSON.parse(registration.metadata);
+
+            await Registration.retrieveRegistrationDataAsString(registration, lrsWreck);
+        }
+        catch (ex) {
+            throw new Error(`Failed to interpret moveOn: ${ex}`);
+        }
+        return registration;
+
+    },
+
+    updateMetadata: async(txn, registration, tenantId) => {
+        try {
+            return await txn("registrations").update({metadata: JSON.stringify(registration.metadata)}).where({tenantId, id: registration.id});
+        }
+        catch (ex) {
+            throw new Error(`Failed to update registration metadata: ${ex}`);
+        }
+    },
+
+    updateCourseAUmap: async(txn, tenantId, registrationId, courseAUs) => {
+        //courseAUs = this.courseAUs;
+        return await txn("registrations_courses_aus").insert(
+            courseAUs.map(
+                (ca) => ({
+                    tenantId,
+                    registrationId,
+                    course_au_id: ca.id,
+                    metadata: JSON.stringify({
+                        version: 1,
+                        moveOn: ca.metadata.moveOn
+                    }),
+                    is_satisfied: ca.metadata.moveOn === "NotApplicable"
+                })
+            )
+        );
     },
 };
