@@ -19,19 +19,25 @@ const Boom = require("@hapi/boom"),
     Wreck = require("@hapi/wreck"),   
     { v4: uuidv4 } = require("uuid"); 
 
+
 let Session; 
 
 module.exports = Session = {
-    
+    ///Where is load called? I cannot find it trigger (the console.log statements) anywhere
+    //no matter what I do in player
     load: async (sessionId, tenantId, {db}) => {
+        console.log("In load func, before getSess is called db is: ", db);
         try {
+            console.log("In load func (2), before getSess is called db is: ", db);
             return await Session.getSession(sessionId, db);
+            
         }   catch (ex) {
                 throw new Error(`Failed to select session: ${ex}`);
         }
     },
 
     getSession: async(sessionId, db) => {
+        console.log("In getSess func db is: ", db);
         return await db
             .first("*")
             .from("sessions")
@@ -42,12 +48,18 @@ module.exports = Session = {
                     );
             })
             .queryContext({jsonCols: ["context_template"]});
+            
     },
+/////Return to this for testing, but I need to know a bit about what 'db' looks like
 
     loadForChange: async (txn, sessionId, tenantId) => {
         
-        let queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
         
+        let queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
+        //console.log("After fetching, queryREsult is: ",)
+       // console.log("In loadForChange, db is: ", db); 
+        console.log("In loadForChange, txn is: ", txn); 
+
         if (! queryResult) {
             await txn.rollback();
             throw Boom.notFound(`session: ${sessionId}`);
@@ -67,6 +79,7 @@ module.exports = Session = {
 
     tryGetQueryResult: async(txn, sessionId, tenantId) => { 
         try {
+            //console.log();
             return await Session.getQueryResult(txn, sessionId, tenantId);
             
         }
@@ -100,6 +113,7 @@ module.exports = Session = {
             })
             .forUpdate()
             .options({nestTables: true});
+            
     },
 
     abandon: async (sessionId, tenantId, by, {db, lrsWreck}) => {
