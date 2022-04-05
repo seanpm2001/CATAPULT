@@ -9,7 +9,34 @@ const { assert } = require('chai');
 const spy = sinon.spy();
 const sandbox = require("sinon").createSandbox();
 
-describe('Test of getQueryResult', function() {
+describe.only('Test of tryGetQueryResult function', async function() {
+    //stub the queryresult func
+    var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake((txn, sessionId, tenantId) => Promise.resolve({getQueryResult: (txn, sessionId, tenantId)}))
+    //var txn = {returnTXN: returnedTXN = sinon.spy()}; 
+    var txn = {}; //a transaction object
+    var txnRollback = false; //to track whether the mocked txn is rolled back
+    var sessionId = sinon.spy(); //Session id
+    var tenantId = 'tenantID'; //tenant id
+
+    console.log(tgqrStub);
+
+    it('passes three arguments to getQueryResult function', async function()  {
+      const test = await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      var data = tgqrStub.getCall(0);
+      console.log(data.args);
+      console.log(data.returnValue);
+      ///if we call with the correct three args, we want it to return a transaction object (knex query)
+      //expect(tgqrStub(txn, sessionId, tenantId)).to.equal(txn, sessionId, tenantId);
+      //expect(Session.getQueryResult(txn, sessionId, tenantId)).to.be.equal(txn);
+      expect(txnRollback).to.be.false;
+      console.log(txn);
+      tgqrStub.reset();
+   });
+
+})
+
+
+describe.skip('Test of getQueryResult', function() {
    //stub the queryresult func
    var gqrStub = sinon.stub(Session,'getQueryResult')
    //var txn = {returnTXN: returnedTXN = sinon.spy()}; 
