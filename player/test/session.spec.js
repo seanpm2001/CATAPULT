@@ -10,27 +10,59 @@ const spy = sinon.spy();
 const sandbox = require("sinon").createSandbox();
 
 describe.only('Test of tryGetQueryResult function', async function() {
-    //stub the queryresult func
-    var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake((txn, sessionId, tenantId) => Promise.resolve({getQueryResult: (txn, sessionId, tenantId)}))
-    //var txn = {returnTXN: returnedTXN = sinon.spy()}; 
+   //stub the trygetqueryresult func, which basically wraps 'getQueryResult'
+    var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(getQueryResult(txn, sessionId, tenantId)).returns(txn);
     var txn = {}; //a transaction object
     var txnRollback = false; //to track whether the mocked txn is rolled back
-    var sessionId = sinon.spy(); //Session id
+    var sessionId = 1234; //Session id
     var tenantId = 'tenantID'; //tenant id
 
-    console.log(tgqrStub);
-
     it('passes three arguments to getQueryResult function', async function()  {
-      const test = await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      expect(tgqrStub.calledOnce);
+      //call with these three arguments
+      expect(tgqrStub.calledWith(txn, sessionId, tenantId));
+      //retreive returned data (from first and only call)
       var data = tgqrStub.getCall(0);
       console.log(data.args);
       console.log(data.returnValue);
-      ///if we call with the correct three args, we want it to return a transaction object (knex query)
-      //expect(tgqrStub(txn, sessionId, tenantId)).to.equal(txn, sessionId, tenantId);
-      //expect(Session.getQueryResult(txn, sessionId, tenantId)).to.be.equal(txn);
-      expect(txnRollback).to.be.false;
+      expect(data.returnValue).to.equal(txn)
       console.log(txn);
-      tgqrStub.reset();
+      console.log(tgqrStub);
+   });
+   
+   it.skip('tries to return the txn(transaction) from getQueryResult,', async function (){
+      await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      Promise.resolve(txn);
+     // expect(tgqrStub.withArgs(txn, sessionId, tenantId).returns(txn, txnRollback = false));
+      console.log(txn)
+      //retreive returned data (from first and only call)
+      var data = tgqrStub.getCall(0);
+      console.log(tgqrStub);
+     // data.returnValue.should.equal(txn);
+      console.log(data.args);
+      console.log(data.resolve)
+      //expect(data.returnValue).to.equal(txn);
+      expect(data.resolve).to.equal(txn)
+      console.log(txn)
+      //expect(txnRollback).to.be.false;
+
+      //gqrStub.reset();
+   });
+
+   it.skip('rollsback the txn (transaction) with requested table information if they do not match', function (){
+      nomatchSessionId = 'nomatch sessionId', //let these be the value it looks for in DB, in this case it finds nothing there
+      nomatchTenantId = 'nomatch tenantID';
+
+      gqrStub.withArgs(txn, nomatchSessionId, nomatchTenantId).returns(txn, txnRollback = true);
+      expect(gqrStub(txn, nomatchSessionId, nomatchTenantId)).to.be.equal(txn);
+      expect(txnRollback).to.be.true;
+
+      gqrStub = function () {throw('Failed to select session, registration course AU, registration and course AU for update:')}  
+      
+      expect(gqrStub).to.throw('Failed to select session, registration course AU, registration and course AU for update:');
+      
+               
    });
 
 })
