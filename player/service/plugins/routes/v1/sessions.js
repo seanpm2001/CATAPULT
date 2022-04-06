@@ -24,7 +24,11 @@ async function handleSession(req, h, args) {
   var tenantId = req.auth.credentials.tenantId;
   var db = req.server.app.db;
 
+<<<<<<< Updated upstream
   if (args && args.doAbandon) {
+=======
+  if (args.doAbandon) {
+>>>>>>> Stashed changes
     var lrsWreck = Wreck.defaults(
       await req.server.methods.lrsWreckDefaults(req)
     );
@@ -44,7 +48,10 @@ async function handleSession(req, h, args) {
 }
 
 module.exports = {
+<<<<<<< Updated upstream
   handleSession,
+=======
+>>>>>>> Stashed changes
   name: "catapult-player-api-routes-v1-sessions",
   register: (server, options) => {
     server.route([
