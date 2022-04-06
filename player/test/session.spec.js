@@ -9,15 +9,14 @@ const { assert } = require('chai');
 const spy = sinon.spy();
 const sandbox = require("sinon").createSandbox();
 
-describe.only('Test of tryGetQueryResult function', function() {
+describe('Test of tryGetQueryResult function', function() {
    
     var txn = {}; //a transaction object
     var txnRollback = false; //to track whether the mocked txn is rolled back
     var sessionId = 1234; //Session id
     var tenantId = 'tenantID'; //tenant id
-    //stub the trygetqueryresult func, which basically wraps 'getQueryResult'
-   //var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(getQueryResult(txn, sessionId, tenantId)).returns(txn);
-    //var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(function getQueryResult(txn, sessionId, tenantId) {return(txn)} );
+    chai.use(chaiAsPromised);
+    chai.should();
 
    it('calls the getQueryResult function and waits for updated txn', async function()  {
       var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(() => Promise.resolve(txn));
@@ -26,60 +25,19 @@ describe.only('Test of tryGetQueryResult function', function() {
       
       assert.equal(test, txn)
       expect(test).to.equal(txn);
-/*
-      //call with these three arguments
-      //expect(tgqrStub.calledWith(txn, sessionId)).to.equal(txn);
-      //retreive returned data (from first and only call)
-      var data = tgqrStub.getCall(0);
-
-      console.log(data, data.args);
-      console.log(data.returnValue);
-      expect(data.returnValue).to.equal(txn)*/
-
       tgqrStub.reset();
       tgqrStub.restore();
    });
    
    it('throws an error if it cannot retrieve,', async function (){
-      var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(() => Promise.reject( error("Failed to select session, registration course AU, registration and course AU for update:") )); 
-///would calling this without callfake in beforeEach, and then adding the diff call fakes in each it work? 
+      var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(() => Promise.reject(new Error(`Failed to select session, registration course AU, registration and course AU for update:`)).then());
+      ///would calling this without callfake in beforeEach, and then adding the diff call fakes in each it work? 
 
-   //tgqrStub = async function throwFunc() {await Session.tryGetQueryResult(txn, sessionId, tenantId)}
-    
-     expect(tgqrStub).to.throw("Failed to select session, registration course AU, registration and course AU for update:");
-      //retreive returned data (from first and only call)
-      var data = tgqrStub.getCall(0);
-      console.log(tgqrStub);
-     // data.returnValue.should.equal(txn);
-      console.log(data.args);
-      console.log(data.resolve)
-      //expect(data.returnValue).to.equal(txn);
-      expect(data.resolve).to.equal(txn)
-      console.log(txn)
-      //expect(txnRollback).to.be.false;
-
-      //gqrStub.reset();
-   });
-
-   it.skip('rollsback the txn (transaction) with requested table information if they do not match', function (){
-      nomatchSessionId = 'nomatch sessionId', //let these be the value it looks for in DB, in this case it finds nothing there
-      nomatchTenantId = 'nomatch tenantID';
-
-      gqrStub.withArgs(txn, nomatchSessionId, nomatchTenantId).returns(txn, txnRollback = true);
-      expect(gqrStub(txn, nomatchSessionId, nomatchTenantId)).to.be.equal(txn);
-      expect(txnRollback).to.be.true;
-
-      gqrStub = function () {throw('Failed to select session, registration course AU, registration and course AU for update:')}  
-      
-      expect(gqrStub).to.throw('Failed to select session, registration course AU, registration and course AU for update:');
-      
-               
-   });
-
+      await expect(Session.tryGetQueryResult(txn, sessionId, tenantId)).to.be.rejectedWith(`Failed to select session, registration course AU, registration and course AU for update:`)
 })
+}),
 
-
-describe.skip('Test of getQueryResult', function() {
+describe('Test of getQueryResult', function() {
    //stub the queryresult func
    var gqrStub = sinon.stub(Session,'getQueryResult')
    //var txn = {returnTXN: returnedTXN = sinon.spy()}; 
@@ -91,6 +49,7 @@ describe.skip('Test of getQueryResult', function() {
    it('takes three arguments',  function()  {
       ///if we call with the correct three args, we want it to return a transaction object (knex query)
       gqrStub.withArgs(txn, sessionId, tenantId).returns(txn);
+
       expect(Session.getQueryResult(txn, sessionId, tenantId)).to.be.equal(txn);
       expect(txnRollback).to.be.false;
       console.log(txn);
@@ -123,4 +82,4 @@ describe.skip('Test of getQueryResult', function() {
       
                
    });
-});
+})
