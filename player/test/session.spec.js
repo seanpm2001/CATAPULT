@@ -9,6 +9,46 @@ const { assert } = require('chai');
 const spy = sinon.spy();
 const sandbox = require("sinon").createSandbox();
 
+describe('Test of load function', function() {
+   
+   var loadStub;
+   var sessionId = 1234; //Session id
+   var db = {}; //stand in for database
+   chai.use(chaiAsPromised);
+   chai.should();
+
+
+   beforeEach(() =>{
+      loadStub = sinon.stub(Session,'load');
+   });
+
+   afterEach(() =>{
+      loadStub.reset();
+      loadStub.restore();
+   });
+
+  it('calls the getSession function and waits for updated database information', async function()  {
+     
+      loadStub.callsFake(() => Promise.resolve(db));
+
+      test = await Session.load(sessionId, db);
+     
+      assert.equal(test, db)
+      expect(test).to.equal(db);
+     
+      loadStub.reset();
+      loadStub.restore();
+  });
+  
+  it('throws an error if it cannot retrieve database informaton,', async function (){
+      loadStub.callsFake(() => Promise.reject(new Error("Failed to select session:")).then());
+     ///would calling this without callfake in beforeEach, and then adding the diff call fakes in each it work? 
+
+     await expect(Session.load(sessionId, db)).to.be.rejectedWith("Failed to select session:");
+   })
+}),
+
+
 describe('Test of tryGetQueryResult function', function() {
    
     var txn = {}; //a transaction object

@@ -26,7 +26,6 @@ module.exports = Session = {
     ///Where is load called? I cannot find it trigger (the console.log statements) anywhere
     //no matter what I do in player
     load: async (sessionId, tenantId, {db}) => {
-        console.log("In load func, before getSess is called db is: ", db);
         try {
             console.log("In load func (2), before getSess is called db is: ", db);
             return await Session.getSession(sessionId, db);
