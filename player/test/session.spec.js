@@ -3,39 +3,50 @@ const sinon = require('sinon'); //base sinon
 const chai = require ("chai"); //base chai
 const chaiAsPromised = require("chai-as-promised");
 const { createSandbox } = require ("sinon");
-const { getQueryResult } = require('../service/plugins/routes/lib/session');
+const { getQueryResult, tryGetQueryResult } = require('../service/plugins/routes/lib/session');
 const Session = require('../service/plugins/routes/lib/session.js');//So Session is exported, can we get it's function here through this?
 const { assert } = require('chai');
 const spy = sinon.spy();
 const sandbox = require("sinon").createSandbox();
 
-describe.only('Test of tryGetQueryResult function', async function() {
-   //stub the trygetqueryresult func, which basically wraps 'getQueryResult'
-    var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(getQueryResult(txn, sessionId, tenantId)).returns(txn);
+describe.only('Test of tryGetQueryResult function', function() {
+   
     var txn = {}; //a transaction object
     var txnRollback = false; //to track whether the mocked txn is rolled back
     var sessionId = 1234; //Session id
     var tenantId = 'tenantID'; //tenant id
+    //stub the trygetqueryresult func, which basically wraps 'getQueryResult'
+   //var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(getQueryResult(txn, sessionId, tenantId)).returns(txn);
+    //var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(function getQueryResult(txn, sessionId, tenantId) {return(txn)} );
 
-    it('passes three arguments to getQueryResult function', async function()  {
-      await Session.tryGetQueryResult(txn, sessionId, tenantId);
-      expect(tgqrStub.calledOnce);
+   it('calls the getQueryResult function and waits for updated txn', async function()  {
+      var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(() => Promise.resolve(txn));
+
+      test = await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      
+      assert.equal(test, txn)
+      expect(test).to.equal(txn);
+/*
       //call with these three arguments
-      expect(tgqrStub.calledWith(txn, sessionId, tenantId));
+      //expect(tgqrStub.calledWith(txn, sessionId)).to.equal(txn);
       //retreive returned data (from first and only call)
       var data = tgqrStub.getCall(0);
-      console.log(data.args);
+
+      console.log(data, data.args);
       console.log(data.returnValue);
-      expect(data.returnValue).to.equal(txn)
-      console.log(txn);
-      console.log(tgqrStub);
+      expect(data.returnValue).to.equal(txn)*/
+
+      tgqrStub.reset();
+      tgqrStub.restore();
    });
    
-   it.skip('tries to return the txn(transaction) from getQueryResult,', async function (){
-      await Session.tryGetQueryResult(txn, sessionId, tenantId);
-      Promise.resolve(txn);
-     // expect(tgqrStub.withArgs(txn, sessionId, tenantId).returns(txn, txnRollback = false));
-      console.log(txn)
+   it('throws an error if it cannot retrieve,', async function (){
+      var tgqrStub = sinon.stub(Session,'tryGetQueryResult').callsFake(() => Promise.reject( error("Failed to select session, registration course AU, registration and course AU for update:") )); 
+///would calling this without callfake in beforeEach, and then adding the diff call fakes in each it work? 
+
+   //tgqrStub = async function throwFunc() {await Session.tryGetQueryResult(txn, sessionId, tenantId)}
+    
+     expect(tgqrStub).to.throw("Failed to select session, registration course AU, registration and course AU for update:");
       //retreive returned data (from first and only call)
       var data = tgqrStub.getCall(0);
       console.log(tgqrStub);
