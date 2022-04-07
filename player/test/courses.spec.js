@@ -3,7 +3,6 @@
 
 var expect = require("chai").expect;
 var sinon = require("sinon");
-var proxyquire = require("proxyquire");
 
 var courses = require("../service/plugins/routes/v1/courses");
 
@@ -24,14 +23,14 @@ describe("buildPayload for courses.js", function() {
   });
 });
 
-describe.skip("getOptions for courses.js", function() {
+describe("getOptions for courses.js", function() {
   it("Checks that only tags are returned if no input is given", function() {
     var options = courses.getOptions();
 
     expect(options).to.eql({ tags: ["api"] });
   });
 
-  it("Checks that auth info is returned with tags if requested", function() {
+  it.skip("Checks that auth info is returned with tags if requested", function() {
     var args = { withAuth: true };
     var options = courses.getOptions(args);
 
