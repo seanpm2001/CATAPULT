@@ -16,48 +16,40 @@
 "use strict";
 
 const Boom = require("@hapi/boom"), 
-    Wreck = require("@hapi/wreck"),   
-    { v4: uuidv4 } = require("uuid"); 
-
+	Wreck = require("@hapi/wreck"),   
+	{ v4: uuidv4 } = require("uuid"); 
 
 let Session; 
 
 module.exports = Session = {
-    ///Where is load called? I cannot find it trigger (the console.log statements) anywhere
-    //no matter what I do in player
-    load: async (sessionId, tenantId, {db}) => {
-        try {
-            console.log("In load func (2), before getSess is called db is: ", db);
-            return await Session.getSession(sessionId, db);
-            
-        }   catch (ex) {
-                throw new Error(`Failed to select session: ${ex}`);
-        }
-    },
 
-    getSession: async(sessionId, db) => {
-        console.log("In getSess func db is: ", db);
-        return await db
-            .first("*")
-            .from("sessions")
-            .where(builder => {
-                builder
-                        .where("sessions.id", sessionId)
-                        .orWhere("sessions.code", sessionId.toString()
-                    );
-            })
-            .queryContext({jsonCols: ["context_template"]});
-            
-    },
-/////Return to this for testing, but I need to know a bit about what 'db' looks like
+	load: async (sessionId, tenantId, {db}) => {
+		try {
+			return await Session.getSession(sessionId, db);
+			
+		}   catch (ex) {
+				throw new Error(`Failed to select session: ${ex}`);
+		}
+	},
+
+	getSession: async(sessionId, db) => {
+		console.log("In getSess func db is: ", db);
+		return await db
+			.first("*")
+			.from("sessions")
+			.where(builder => {
+				builder
+					.where("sessions.id", sessionId)
+					.orWhere("sessions.code", sessionId.toString()
+				);
+			})
+			.queryContext({jsonCols: ["context_template"]});
+			
+	},
 
     loadForChange: async (txn, sessionId, tenantId) => {
         
-        
         let queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
-        //console.log("After fetching, queryREsult is: ",)
-       // console.log("In loadForChange, db is: ", db); 
-        console.log("In loadForChange, txn is: ", txn); 
 
         if (! queryResult) {
             await txn.rollback();
