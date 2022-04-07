@@ -92,6 +92,7 @@ describe.only('Test of loadForChange function', function() {
 		registration,
 		courseAu
 
+	var txnReturn = [sessions= 2, registrationsCoursesAus =13, registrations = 26, coursesAus =4]
 
 	chai.use(chaiAsPromised);
 	chai.should();
@@ -118,23 +119,24 @@ describe.only('Test of loadForChange function', function() {
 
 	it('verifies queryResult was retrieved and uses it to assign session registration information', async function() {
 	
-		var sessions, //Stand in for values that would be deconstructed from returned txn
-		registrationsCoursesAus, 
-		registrations, 
-		coursesAus
-
-		lfcStub.callsFake(() => Promise.resolve(txn).then(queryResult = true));
+		lfcStub.callsFake(() => Promise.resolve(txnReturn).then(queryResult = true));
 		expect(Session.loadForChange(txn, sessionId, tenantId));
 
 		if (queryResult == true) {
 			txnRollback = false;
-
-			function assignValues () {
-				
-			}
+			//does assignValues even need to be a function? I mean it's only used once.
+			console.log('is this being trigered>')
+				var [session,
+					regCourseAu,
+					registration,
+					courseAu
+				 = txnReturn;
+				console.log(txnReturn, session)
+				console.log(sessions)
 		}
 
-		expect(txnRollback).to.be.true;
+		expect(session).to.equal(2);
+		expect(txnRollback).to.be.false;
 		expect(errorAndRollback).to.throw('session: ');
 	}),
 	
