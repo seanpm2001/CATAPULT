@@ -2,12 +2,9 @@ const expect =require('chai').expect; //utilize chai assertion library 'expect'
 const sinon = require('sinon'); //base sinon
 const chai = require ("chai"); //base chai
 const chaiAsPromised = require("chai-as-promised");
-const { createSandbox } = require ("sinon");
-const { getQueryResult, tryGetQueryResult } = require('../service/plugins/routes/lib/session');
 const Session = require('../service/plugins/routes/lib/session.js');//So Session is exported, can we get it's function here through this?
 const { assert } = require('chai');
 const spy = sinon.spy();
-const sandbox = require("sinon").createSandbox();
 chai.use(chaiAsPromised);
 chai.should();
 
@@ -270,17 +267,12 @@ describe('Test of abandon function', function() {
 	var abandonStub;
 	var db = {transaction: txn = {}}
 	var lrsWreck;
-	var dbWreckArg = [db, lrsWreck]; //stand in for object passed as arg to abandon
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
 	var tenantId = 'tenantID'; 
 	var by; //stand in for what exactly???
 	var queryResult;
-	var session, //Stand in for Session values that are returned
-		regCourseAu,
-		registration,
-		courseAu
 	var regCourseAuObject = {courseAu:0 } //mock regCourseAu object assigned in this function
 	var sessionReturn = [rtnSession= 2, rtnRegCourseAu =13, returnRegistration = 26, rtnCoursesAu =4]
 
@@ -383,10 +375,10 @@ describe('Test of abandon function', function() {
 		///of 'abandon does for any future questions or updates. 
 	})
 })
-/**
- * describe('Test of tryGetQueryResult function', function() {
+
+describe('Test of tryGetSessionInfo function', function() {
    
-	var tgqrStub;
+	var tgsiStub;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
@@ -395,33 +387,230 @@ describe('Test of abandon function', function() {
 	chai.should();
 
 	beforeEach(() =>{
-		tgqrStub = sinon.stub(Session,'tryGetQueryResult');
+		tgsiStub = sinon.stub(Session,'tryGetSessionInfo');
 	});
 
 	afterEach(() =>{
-		tgqrStub.reset();
-		tgqrStub.restore();
+		tgsiStub.reset();
+		tgsiStub.restore();
 	});
 
-	it('calls the getQueryResult function and waits for updated txn', async function()  {
+	it('calls the loadForChange function and waits for updated session information', async function()  {
 		
-		gqrStub = sinon.stub(Session, 'getQueryResult');
-		tgqrStub.callsFake(gqrStub.withArgs(txn, sessionId, tenantId).returns(Promise.resolve(txn)));
+		lfcStub = sinon.stub(Session, 'loadForChange');
+		tgsiStub.callsFake(lfcStub.withArgs(txn, sessionId, tenantId).returns(Promise.resolve(txn, sessionId, tenantId)));
 
-		test = await Session.getQueryResult(txn, sessionId, tenantId);
+		sessionInfo = await Session.loadForChange(txn, sessionId, tenantId);
 		
-		assert.equal(test, txn)
-		expect(test).to.equal(txn);
+		assert.equal(sessionInfo, txn, sessionId, tenantId)
+		expect(sessionInfo).to.equal(txn, sessionId, tenantId);
 	});
 
-	it('throws an error if it cannot retrieve,', async function (){
+	it('catches and throws an error if the Session information was not retrieved successfully and rolls back transaction', async function() {
 		
-		tgqrStub.callsFake(() => Promise.reject(new Error(`Failed to select session, registration course AU, registration and course AU for update:`)).then());
+		tgsiStub.callsFake(() => Promise.reject('cant retrieve').then(txnRollback = true));
+		await expect(Session.tryGetSessionInfo(txn, sessionId, tenantId)).to.be.rejectedWith(`cant retrieve`);
 
-		await expect(Session.tryGetQueryResult(txn, sessionId, tenantId)).to.be.rejectedWith(`Failed to select session, registration course AU, registration and course AU for update:`)
-	})
+		if(txnRollback == true){
+			function error () {
+				throw Error(`Boom error (internal)`);
+			}
+		}
+
+		expect(txnRollback).to.be.true;
+		expect(error).to.throw('Boom error (internal)');
+	});
 }),
-*/
-	
 
+describe('Test of initializeDuration function', function() {
+
+	let durationSeconds;
+	sessionInitialized = true; //for test we assume true, not being intialized is covered in another func
+	sessionInitializedAt = new Date().getTime(); //mock session starting time
+	
+	it(' checks if Session has been initialized and if true returns the duration since then', function (){
+		
+		if (sessionInitialized == true) {
+			
+			durationSeconds = (new Date().getTime() - sessionInitializedAt) / 1000;
+			
+			return durationSeconds; 
+		}
+		 
+		assert.isDefined(durationSeconds);
+		assert.isNumber(durationSeconds);
+	});
+}),
+
+describe('Test of determineSessionTerminated function', async function() {
+   
+	var dstStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var session; 
+	chai.use(chaiAsPromised);
+	chai.should();
+
+	beforeEach(() =>{
+		dstStub = sinon.stub(Session,'determineSessionTerminated');
+	});
+
+	afterEach(() =>{
+		dstStub.reset();
+		dstStub.restore();
+	});
+
+	it('checks the Session status, and if terminated, rolls back the txn (transaction object)', async function()  {
+		
+		dstStub.withArgs(session, txn).callsFake(() => Promise.resolve(txn).then(txnRollback = true));
+
+		sessionInfo = await Session.determineSessionTerminated(session, txn);
+		
+		expect(txnRollback).to.be.true;
+
+		assert.equal(sessionInfo, txn)
+		expect(sessionInfo).to.equal(txn);
+	});
+}),
+
+describe('Test of determineSessionAbandoned function', async function() {
+   
+	var dsaStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var session; 
+	chai.use(chaiAsPromised);
+	chai.should();
+
+	beforeEach(() =>{
+		dsaStub = sinon.stub(Session,'determineSessionAbandoned');
+	});
+
+	afterEach(() =>{
+		dsaStub.reset();
+		dsaStub.restore();
+	});
+
+	it('checks the Session status, and if abandoned, rolls back the txn (transaction object)', async function()  {
+		
+		dsaStub.withArgs(session, txn).callsFake(() => Promise.resolve(txn).then(txnRollback = true));
+
+		sessionInfo = await Session.determineSessionAbandoned(session, txn);
+		
+		expect(txnRollback).to.be.true;
+
+		assert.equal(sessionInfo, txn)
+		expect(sessionInfo).to.equal(txn);
+	});
+}),
+
+describe('Test of retrieveResponse function', function() {
+   
+	var rrStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var durationSeconds, session, regCourseAu, registration, lrsWreck
+	var stResponse, stResponseBody
+	chai.use(chaiAsPromised);
+	chai.should();
+
+	beforeEach(() =>{
+		rrStub = sinon.stub(Session,'retrieveResponse');
+	});
+
+	afterEach(() =>{
+		rrStub.reset();
+		rrStub.restore();
+	});
+
+	it('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
+		
+		rrStub.withArgs(durationSeconds, session, regCourseAu, registration, lrsWreck, txn).callsFake(() => (Promise.resolve(stResponse, {json: true})));
+
+		stResponseBody = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
+		
+		assert.equal(stResponseBody, stResponse, {json: true})
+		expect(stResponseBody).to.equal(stResponse, {json: true});
+	});
+
+	it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function() {
+		
+		rrStub.callsFake(() => Promise.reject('cant retrieve').then(txnRollback = true));
+		await expect(Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn)).to.be.rejectedWith(`cant retrieve`);
+
+		if(txnRollback == true){
+			function error () {
+				throw Error(`Failed request to store abandoned statement: `);
+			}
+		}
+
+		expect(txnRollback).to.be.true;
+		expect(error).to.throw('Failed request to store abandoned statement: ');
+	});
+}),
+
+describe('Test of checkStatusCode function', function() {
+
+	let statusCode = 300;
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+
+	it(' checks if status code (from POST response in retrieveResponse) is equal to 200. If not, throws an error and rolls back transaction', function (){
+		
+		if (statusCode !== 200) {
+			
+			txnRollback = true;
+			
+			function error () {
+				throw Error(`Failed request to store abandoned statement: `);
+			}		}
+
+		expect(txnRollback).to.be.true;
+		expect(error).to.throw('Failed request to store abandoned statement: ');
+	});
+}),
+
+describe('Test of txnUpdate function', function() {
+   
+	var txnUpdateStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var tenantId = 'tenantID';
+	var by, session;
+	chai.use(chaiAsPromised);
+	chai.should();
+
+	beforeEach(() =>{
+		txnUpdateStub = sinon.stub(Session,'txnUpdate');
+	});
+
+	afterEach(() =>{
+		txnUpdateStub.reset();
+		txnUpdateStub.restore();
+	});
+
+	it("uses the transaction objects 'update' and 'where' functions to update the Session", async function()  {
+		
+		txnUpdateStub.withArgs(session, tenantId, txn, by).callsFake(() => (Promise.resolve(txn))); //we will pass back txn, as the updating of txn actually falls under third party functions
+
+		testResult = await Session.txnUpdate(session, tenantId, txn, by);
+		
+		assert.equal(testResult, txn)
+		expect(testResult).to.equal(txn);
+	});
+
+	it('catches and throws an error if the session information was not updated and returned successfully, then rolls back transaction', async function() {
+		
+		txnUpdateStub.callsFake(() => Promise.reject('cant update').then(txnRollback = true));
+		await expect(Session.txnUpdate(session, tenantId, txn, by)).to.be.rejectedWith(`cant update`);
+
+		if(txnRollback == true){
+			function error () {
+				throw Error(`Failed to update session: `);
+			}
+		}
+
+		expect(txnRollback).to.be.true;
+		expect(error).to.throw('Failed to update session: ');
+	});
+})
 
