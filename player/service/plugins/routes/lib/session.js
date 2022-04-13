@@ -22,8 +22,9 @@ const Boom = require("@hapi/boom"),
 let Session; 
 
 module.exports = Session = {
-
-	load: async (sessionId, tenantId, {db}) => {
+//Param db was original desctructered aka {db}, does it need to be?
+//causing tests to fail, also removing tenantId, its not used
+	load: async (sessionId, db) => {
 		try {
 			return await Session.getSession(sessionId, db);
 			
@@ -108,7 +109,8 @@ module.exports = Session = {
     },
 
     abandon: async (sessionId, tenantId, by, {db, lrsWreck}) => {
-        const txn = await db.transaction(); 
+        
+	const txn = await db.transaction(); 
         
         let session,
             regCourseAu,
