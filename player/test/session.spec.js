@@ -1,25 +1,28 @@
-const expect =require('chai').expect; //utilize chai assertion library 'expect'
+const { expect } =require('chai'); //utilize chai assertion library 'expect'
+const { createSandbox } = require("sinon");
 const sinon = require('sinon'); //base sinon
 const chai = require ("chai"); //base chai
 const chaiAsPromised = require("chai-as-promised");
 const Session = require('../service/plugins/routes/lib/session.js');//So Session is exported, can we get it's function here through this?
 const { assert } = require('chai');
+const proxyquire = require('proxyquire');
+const session = require('../service/plugins/routes/lib/session.js');
 var spy = sinon.spy;
+
+//const { getSession } =require('../service/plugins/routes/lib/session.js');
+
 chai.use(chaiAsPromised);
 chai.should();
 
 describe.only('Test of load function', function() {
 
-	var loadStub, getSessionStub;
+	var loadSpy, getSessionStub;
 	var sessionId = 1234; 
 	var db = {}; //stand in for database
-	var fetchedSession;
-	
-	//chai.return();
-	///sooo don't stub load but stub what load calls???
 
 	beforeEach(() =>{
 		getSessionStub = sinon.stub(Session, 'getSession');
+
 	});
 
 	afterEach(() =>{
@@ -27,49 +30,47 @@ describe.only('Test of load function', function() {
 		getSessionStub.restore();
 	});
 
-	it('tries to calls the getSession function and waits for updated database information. Will throw an error if it cannot retrieve.',  function()  {
-
-		var loadSpy = spy(Session, "load")
-
-		Session.load(sessionId, db)
-
-		Session.load.restore();
-	
-		expect(loadSpy.calledOnceWith(sessionId, db)).to.be.true;
+	it('tries to calls the getSession function and waits for updated database information.', async function()  {
+		getSessionStub.withArgs(sessionId, db).resolves(db)
+		var loadSpy =spy(Session, "load")
 		
-	}),
+		test = await Session.load(sessionId, db);
 
-	it('throws an error if it cannot retrieve database informaton,', async function (){
-		ex = 'thrown error'
-		loadStub = sinon.spy(Session,'load');
-		
-		getSessionStub.callsFake(() => Promise.reject(new Error(ex)).then(fetchedSession = false));
-
-		//await expect(Session.load(sessionId, db)).to.be.rejectedWith(ex);
-		try {
-			return await Session.load(sessionId, db)//getSessionStub.withArgs(sessionId, db).callsFake(() => Promise.reject(new Error(ex)).then(fetchedSession = false));
-			//expect(loadSpy.calledOnceWith(sessionId, db))
-		}   catch (ex) {
-			function error(ex = 'thrown error') {
-				throw new Error(`Failed to select session: ${ex}`);
-		}
-			}
-		/*if (fetchedSession == false) {
-			
-			function error(ex = 'thrown error') {
-				throw new Error(`Failed to select session: ${ex}`);
-			}
-		}*/
-		
-
-	//	loadStub.reset();
-	//	loadStub.restore();
 		Session.load.restore();
 		Session.getSession.restore();
 
-		expect(fetchedSession).to.be.false;
-		expect(error).to.throw(`Failed to select session: ${ex}`);
+		expect(loadSpy.calledOnceWithExactly(sessionId, db)).to.be.true;
+
+		expect(getSessionStub.calledOnceWithExactly(sessionId, db)).to.be.true;
+
+		expect(test).to.equal(db)
 	})
+
+	it('throws an error if it cannot retrieve database informaton,', async function (){
+		getSessionStub.withArgs(sessionId, db).rejects(`Failed to select session: Error`)
+		var loadSpy =spy(Session, "load")
+		
+		try{
+			await Session.load(sessionId, db);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			function error () {			
+			throw new Error(`Failed to select session: ${ex}`);
+			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw(`Failed to select session: ${ex}`);
+		}
+
+		Session.load.restore();
+		Session.getSession.restore();
+		
+		expect(loadSpy.calledOnceWithExactly(sessionId, db)).to.be.true;
+
+		expect(getSessionStub.calledOnceWithExactly(sessionId, db)).to.be.true;
+	})
+
 }),
 describe('Test of getSession function', function() {
 
