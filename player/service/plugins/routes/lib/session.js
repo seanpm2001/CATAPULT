@@ -22,7 +22,7 @@ const Boom = require("@hapi/boom"),
 let Session; 
 
 module.exports = Session = {
-//Param db was original desctructered aka {db}, does it need to be?
+//Param db was originally desctructered aka {db}, does it need to be?
 //causing tests to fail, also removing tenantId, its not used
 	load: async (sessionId, db) => {
 		try {
@@ -49,24 +49,30 @@ module.exports = Session = {
 	},
 
     loadForChange: async (txn, sessionId, tenantId) => {
-        
+
         let queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
 
-        if (! queryResult) {
-            await txn.rollback();
-            throw Boom.notFound(`session: ${sessionId}`);
+        try{
+            const {
+                sessions: session,
+                registrationsCoursesAus: regCourseAu,
+                registrations: registration,
+                coursesAus: courseAu
+            } = queryResult;
+
+            regCourseAu.courseAu = courseAu;
+
+            return {session, regCourseAu, registration, courseAu};
+            
+        }catch{
+            console.log('catching')
+        //this if is probably not needed now that I have moved it to a try/catch block
+           // {if (! queryResult) {
+                await txn.rollback();
+                throw Boom.notFound(`session: ${sessionId}`);
+           // }
         }
-
-        const {
-            sessions: session,
-            registrationsCoursesAus: regCourseAu,
-            registrations: registration,
-            coursesAus: courseAu
-        } = queryResult;
-
-        regCourseAu.courseAu = courseAu;
     
-       return {session, regCourseAu, registration, courseAu};
     },
 
     tryGetQueryResult: async(txn, sessionId, tenantId) => { 

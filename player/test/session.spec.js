@@ -6,7 +6,7 @@ const chaiAsPromised = require("chai-as-promised");
 const Session = require('../service/plugins/routes/lib/session.js');//So Session is exported, can we get it's function here through this?
 const { assert } = require('chai');
 const proxyquire = require('proxyquire');
-const session = require('../service/plugins/routes/lib/session.js');
+//const session = require('../service/plugins/routes/lib/session.js');
 var spy = sinon.spy;
 
 //const { getSession } =require('../service/plugins/routes/lib/session.js');
@@ -14,7 +14,7 @@ var spy = sinon.spy;
 chai.use(chaiAsPromised);
 chai.should();
 
-describe.only('Test of load function', function() {
+describe('Test of load function', function() {
 
 	var loadSpy, getSessionStub;
 	var sessionId = 1234; 
@@ -32,7 +32,7 @@ describe.only('Test of load function', function() {
 
 	it('tries to calls the getSession function and waits for updated database information.', async function()  {
 		getSessionStub.withArgs(sessionId, db).resolves(db)
-		var loadSpy =spy(Session, "load")
+		loadSpy = spy(Session, "load")
 		
 		test = await Session.load(sessionId, db);
 
@@ -43,12 +43,13 @@ describe.only('Test of load function', function() {
 
 		expect(getSessionStub.calledOnceWithExactly(sessionId, db)).to.be.true;
 
-		expect(test).to.equal(db)
+		expect(test).to.equal(db);
 	})
 
 	it('throws an error if it cannot retrieve database informaton,', async function (){
+		
 		getSessionStub.withArgs(sessionId, db).rejects(`Failed to select session: Error`)
-		var loadSpy =spy(Session, "load")
+		loadSpy =spy(Session, "load")
 		
 		try{
 			await Session.load(sessionId, db);
@@ -72,13 +73,12 @@ describe.only('Test of load function', function() {
 	})
 
 }),
+
 describe('Test of getSession function', function() {
 
 	var getSessionStub;
 	var sessionId = 1234; 
 	var db = {}; //stand in for database
-	chai.use(chaiAsPromised);
-	chai.should();
 
 	beforeEach(() =>{
 		getSessionStub = sinon.stub(Session,'getSession');
@@ -95,11 +95,14 @@ describe('Test of getSession function', function() {
 
 		test = await Session.getSession(sessionId, db);
 
-		assert.equal(test, db)
+		Session.getSession.restore();
+		
+		expect(getSessionStub.calledOnceWithExactly(sessionId, db)).to.be.true;
+
 		expect(test).to.equal(db);
 	});
 
-	it('throws an error if it cannot retrieve database informaton,', async function (){
+	it.skip('throws an error if it cannot retrieve database informaton,', async function (){
 		
 		getSessionStub.callsFake(() => Promise.reject(new Error("Failed to select session:")));
 
@@ -109,98 +112,82 @@ describe('Test of getSession function', function() {
 
 describe('Test of loadForChange function', function() {
    
-	var lfcStub;
+	var tgqrStub, lfcSpy;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
 	var tenantId = 'tenantID'; 
 	var queryResult;
-	var session, //Stand in for Session values that are returned
-		regCourseAu,
-		registration,
-		courseAu
-	var regCourseAuObject = {courseAu:0 } //mock regCourseAu object assigned in this function
-	var txnReturn = [sessions= 2, registrationsCoursesAus =13, registrations = 26, coursesAus =4]
+	var regCourseAu= { courseAu:0}  //mock regCourseAu object assigned in this function
 
 	beforeEach(() =>{
-		lfcStub = sinon.stub(Session,'loadForChange');
+
+		tgqrStub = sinon.stub(Session,'tryGetQueryResult');
+		lfcSpy =sinon.spy(Session, 'loadForChange');	
 	});
 
 	afterEach(() =>{
-		lfcStub.reset();
-		lfcStub.restore();
-	});
-
-	it('calls the tryGetQueryResult function and waits for updated txn, assigning it to queryResult variable', async function()  {
-		
-		tgqrStub = sinon.stub(Session,'tryGetQueryResult');
-
-		lfcStub.callsFake(() => Promise.resolve(txn));
-		tgqrStub.callsFake(() => Promise.resolve(txn));
-
-		queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
-		
-		assert.equal(queryResult, txn)
-		expect(queryResult).to.equal(txn);
 
 		tgqrStub.reset();
 		tgqrStub.restore();
-	}),
+		
+		lfcSpy.restore();
+	});
 
-	it('verifies queryResult was retrieved and uses it to assign session registration information', async function() {
-	
-		lfcStub.callsFake(() => Promise.resolve(txnReturn).then(queryResult = true));
-		expect(Session.loadForChange(txn, sessionId, tenantId));
+	it('calls the tryGetQueryResult function and waits for updated txn, assigning it to queryResult variable', async function()  {
 
-		if (queryResult == true) {
+		tgqrStub.withArgs(txn, sessionId, tenantId).resolves(txn);
 
-			txnRollback = false;
+		queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
+		
+		Session.loadForChange.restore();
+		Session.tryGetQueryResult.restore();
 
-			var [session,
-					regCourseAu,
-					registration,
-					courseAu
-				] = txnReturn;
-
-			regCourseAuObject.courseAu = courseAu;
-		}
-
-		expect(session).to.equal(2);
-		expect(regCourseAu).to.equal(13);
-		expect(registration).to.equal(26);
-		expect(courseAu).to.equal(4);
-		expect(regCourseAuObject.courseAu).to.equal(4);
-		expect(txnRollback).to.be.false;
+		expect(tgqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+		
+		expect(queryResult).to.equal(txn);
 	}),
 	
 	it('returns the successfully updated Session registration information', async function()  {
 		
-		lfcStub.withArgs(txn, sessionId, tenantId).callsFake(() => Promise.resolve(session, regCourseAu, registration, courseAu));
+	tgqrStub.callsFake(() => {
+		var queryResult = 
+		{sessions :1, //Stand in for Session values that are returned
+			registrationsCoursesAus : regCourseAu = {courseAu:0 },
+			registrations : 3,
+			coursesAus : 4}
 
-		queryResult = await Session.loadForChange(txn, sessionId, tenantId);
-		
-		assert.equal(queryResult, session, regCourseAu, registration, courseAu)
-		expect(queryResult).to.equal(session, regCourseAu, registration, courseAu);
+		return queryResult});
+
+		lfcResult = await Session.loadForChange();
+
+		Session.loadForChange.restore();
+		Session.tryGetQueryResult.restore()
+
+		expect(lfcResult).to.eql({session: 1, regCourseAu: {courseAu: 4}, registration: 3, courseAu: 4});
 	}),
 	
 	it('throws an error if queryResult was not retrieved successfully and rolls back transaction', async function() {
-		
-		lfcStub.callsFake(() => Promise.reject('cant retrieve').then(queryResult = false));
-		await expect(Session.loadForChange(txn, sessionId, tenantId)).to.be.rejectedWith(`cant retrieve`);
 
-		if (queryResult == false) {
-			txnRollback = true;
-
-			function errorAndRollback () {
-				throw Error(`session: `);
+		try{ 
+			expect(await Session.loadForChange(txn, sessionId, tenantId)).to.throw()
+			assert.fail(error);
+		}
+		catch{
+			function error() {
+				throw Error(`session: ${sessionId}`);
 			}
+
+			txnRollback = true;
+			expect(error).to.throw(`session: ${sessionId}`);
 		}
 
-		expect(txnRollback).to.be.true;
-		expect(errorAndRollback).to.throw('session: ');
-	})
+		Session.loadForChange.restore();
 
-	
+		expect(lfcSpy.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+		
+		expect(txnRollback).to.be.true;
+	})
 }),
 
 describe('Test of tryGetQueryResult function', function() {
