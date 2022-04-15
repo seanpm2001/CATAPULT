@@ -6,6 +6,8 @@ const chaiAsPromised = require("chai-as-promised");
 const Session = require('../service/plugins/routes/lib/session.js');//So Session is exported, can we get it's function here through this?
 const { assert } = require('chai');
 const proxyquire = require('proxyquire');
+const { load } = require('proxyquire');
+const { initializeDuration } = require('../service/plugins/routes/lib/session.js');
 //const session = require('../service/plugins/routes/lib/session.js');
 var spy = sinon.spy;
 
@@ -101,13 +103,6 @@ describe('Test of getSession function', function() {
 
 		expect(test).to.equal(db);
 	});
-
-	it.skip('throws an error if it cannot retrieve database informaton,', async function (){
-		
-		getSessionStub.callsFake(() => Promise.reject(new Error("Failed to select session:")));
-
-		await expect(Session.getSession(sessionId, db)).to.be.rejectedWith("Failed to select session:");
-	})
 }),
 
 describe('Test of loadForChange function', function() {
@@ -192,7 +187,7 @@ describe('Test of loadForChange function', function() {
 
 describe('Test of tryGetQueryResult function', function() {
    
-	var tgqrStub;
+	var tgqrSpy, gqrStub;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
@@ -201,34 +196,57 @@ describe('Test of tryGetQueryResult function', function() {
 	chai.should();
 
 	beforeEach(() =>{
-		tgqrStub = sinon.stub(Session,'tryGetQueryResult');
+		tgqrSpy = sinon.spy(Session, "tryGetQueryResult")
+		gqrStub = sinon.stub(Session,'getQueryResult');
 	});
 
 	afterEach(() =>{
-		tgqrStub.reset();
-		tgqrStub.restore();
+		tgqrSpy. restore();
+
+		gqrStub.reset();
+		gqrStub.restore();
 	});
 
 	it('calls the getQueryResult function and waits for updated txn', async function()  {
 		
-		gqrStub = sinon.stub(Session, 'getQueryResult');
-		tgqrStub.callsFake(gqrStub.withArgs(txn, sessionId, tenantId).returns(Promise.resolve(txn)));
+		gqrStub.withArgs(txn, sessionId, tenantId).resolves(txn);
 
-		queryResult = await Session.getQueryResult(txn, sessionId, tenantId);
+		queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
 		
-		assert.equal(queryResult, txn)
+		Session.tryGetQueryResult.restore();
+		Session.getQueryResult.restore();
+
+		expect(tgqrSpy.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+		expect(gqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+
 		expect(queryResult).to.equal(txn);
-		
-		gqrStub.reset();
-		gqrStub.restore();
 		
 	});
 
 	it('throws an error if it cannot retrieve,', async function (){
 		
-		tgqrStub.callsFake(() => Promise.reject(new Error(`Failed to select session, registration course AU, registration and course AU for update:`)).then());
+		gqrStub.withArgs(txn, sessionId, tenantId).rejects(`Failed to select session, registration course AU, registration and course AU for update: `)
+		
+		try{
+			await Session.tryGetQueryResult(txn, sessionId, tenantId);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			
+			function error () {			
+				throw new Error(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
+			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
+		}
 
-		await expect(Session.tryGetQueryResult(txn, sessionId, tenantId)).to.be.rejectedWith(`Failed to select session, registration course AU, registration and course AU for update:`)
+		Session.tryGetQueryResult.restore();
+		Session.getQueryResult.restore();
+		
+		expect(tgqrSpy.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+
+		expect(gqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
 	})
 }),
 
@@ -251,141 +269,96 @@ describe('Test of getQueryResult', function() {
 
 	it('returns the txn(transaction) with requested table information if  match for args sessionId and tenantId are found in database', async function (){
 		
-		gqrStub.withArgs(txn, sessionId, tenantId).callsFake(() => Promise.resolve(txn));
+		gqrStub.callsFake(() => Promise.resolve(txn));
 
 		queryResult = await Session.getQueryResult(txn, sessionId, tenantId);
 		
-		assert.equal(queryResult,txn)
+		Session.getQueryResult.restore();
+		
+		expect(gqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+
 		expect(queryResult).to.equal(txn);
+		
 		expect(txnRollback).to.be.false;
 	});
 
-	it('rollsback the txn (transaction) with requested table information if they do not match', async function (){
-
-		gqrStub.withArgs(txn, sessionId, tenantId).callsFake(() => Promise.reject('No match in Database').then(txnRollback = true));
-		await expect(Session.getQueryResult(txn, sessionId, tenantId)).to.be.rejectedWith(`No match in Database`);
-
-		if (txnRollback == true) {
-
-			function error() {
-				throw Error('Failed to select session, registration course AU, registration and course AU for update:');
-			}
-		}
-
-		expect(txnRollback).to.be.true;
-		expect(error).to.throw('Failed to select session, registration course AU, registration and course AU for update:');
-	
-	});
 }),
 
 describe('Test of abandon function', function() {
    
-	var abandonStub;
+	var abandonSpy;
 	var db = {transaction: txn = {}}
-	var lrsWreck;
+	var lrsWreck, courseAu, session, regCourseAu, registration, sessionId, tenantId, by;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
 	var tenantId = 'tenantID'; 
-	var by; //stand in for what exactly???
 	var queryResult;
-	var regCourseAuObject = {courseAu:0 } //mock regCourseAu object assigned in this function
-	var sessionReturn = [rtnSession= 2, rtnRegCourseAu =13, returnRegistration = 26, rtnCoursesAu =4]
 
 	beforeEach(() =>{
-		abandonStub = sinon.stub(Session,'abandon');
+		abandonSpy = sinon.spy(Session, 'abandon');
+		lfcStub = sinon.stub(Session, 'loadForChange')
+
 	});
 
 	afterEach(() =>{
-		abandonStub.reset();
-		abandonStub.restore();
-	});
-
-	it('retrieves the database transaction object (the txn) ', async function() {
-			
-		abandonStub.withArgs(db).callsFake(() => Promise.resolve(db.transaction));
-
-		queryResult = await Session.abandon(db);
-
-		expect(queryResult).to.eql(txn);//note use of 'eql' here as values are the same but reference point is not
-
-	})
-
-	it('tries to call the loadForChange function and waits for updated Session information', async function()  {
+		abandonSpy.restore();
 		
-		lfcStub = sinon.stub(Session,'loadForChange');
-
-		lfcStub.withArgs(txn, sessionId, tenantId, courseAu).callsFake(() => Promise.resolve(sessionReturn));
-
-		queryResult = await Session.loadForChange(txn, sessionId, tenantId, courseAu);
-			
-		var [session,
-			regCourseAu,
-			registration,
-			courseAu
-		] = sessionReturn;
-		
-		expect(session).to.equal(2);
-		expect(regCourseAu).to.equal(13);
-		expect(registration).to.equal(26);
-		expect(courseAu).to.equal(4);
-		expect(txnRollback).to.be.false;
-
-		assert.equal(queryResult, sessionReturn)
-		expect(queryResult).to.equal(sessionReturn);
-
 		lfcStub.reset();
 		lfcStub.restore();
+	});
+
+	it('retrieves the database transaction object, and tries to call the loadForChange function, to update Session information ', async function() {
+			
+		Session.abandon(sessionId, tenantId, by, {db, lrsWreck});
+
+		lfcStub.withArgs(txn, sessionId, tenantId, courseAu).callsFake(() => {
+			var queryResult = {session,
+			regCourseAu,
+			registration,
+			courseAu}
+			});
+
+		queryResult = await Session.loadForChange(txn, sessionId, tenantId, courseAu);
+
+		Session.abandon.restore();
+		Session.loadForChange.restore();
+
+		expect(abandonSpy.calledOnceWithExactly(sessionId, tenantId, by, {db, lrsWreck})).to.be.true;
+		expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId, courseAu)).to.be.true;
+
 	}),
 
 	it('catches and throws an error if the Session information was not retrieved successfully and rolls back transaction', async function() {
 		
-		abandonStub.callsFake(() => Promise.reject('cant retrieve').then(txnRollback = true));
-		await expect(Session.abandon(sessionId, tenantId, by, {db, lrsWreck})).to.be.rejectedWith(`cant retrieve`);
-
-		if(txnRollback == true){
+		lfcStub.withArgs(txn, sessionId, tenantId, courseAu).rejects('Boom error (internal)');
+		
+		Session.abandon(sessionId, tenantId, by, {db, lrsWreck});
+		
+		try {
+			
+			await Session.loadForChange(txn, sessionId, tenantId, courseAu);
+			assert.fail(error); //ensure promise was rejected, ie no false positive
+		 }
+		 catch  {
+			txnRollback = true;
 			function error () {
-				throw Error(`Boom error (internal)`);
+				throw new Error('Boom error (internal)');
 			}
-		}
+		 }
+
+		Session.abandon.restore();
+		Session.loadForChange.restore();
 
 		expect(txnRollback).to.be.true;
 		expect(error).to.throw('Boom error (internal)');
+
+		expect(abandonSpy.calledOnceWithExactly(sessionId, tenantId, by, {db, lrsWreck})).to.be.true;
+		expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId, courseAu)).to.be.true;
 	})
-
-	it('verifies queryResult was retrieved and uses it to assign session registration information', async function() {
-	
-		lfcStub = sinon.stub(Session,'loadForChange');
-
-		lfcStub.withArgs(txn, sessionId, tenantId, courseAu).callsFake(() => Promise.resolve(sessionReturn).then(queryResult = true));
-		expect(Session.loadForChange(txn, sessionId, tenantId, courseAu));
-
-		if (queryResult == true) {
-
-			txnRollback = false;
-
-			var [session,
-					regCourseAu,
-					registration,
-					courseAu
-				] = sessionReturn;
-
-			regCourseAuObject.courseAu = courseAu;
-		}
-
-		expect(session).to.equal(2);
-		expect(regCourseAu).to.equal(13);
-		expect(registration).to.equal(26);
-		expect(courseAu).to.equal(4);
-		expect(regCourseAuObject.courseAu).to.equal(4);
-		expect(txnRollback).to.be.false;
-
-		lfcStub.reset();
-		lfcStub.restore();
-	}),
 	
 	it('deterimines the Session is niether abandoned or terminated, and has it update and commit the transaction', async function()  {
-		
+	
 		///This part of abandon function is all done via other functions, which will be tested separetly on their own.
 		///There is no more logic executed in this function, but wanted to leave this space to describe what the rest 
 		///of 'abandon does for any future questions or updates. 
@@ -394,65 +367,88 @@ describe('Test of abandon function', function() {
 
 describe('Test of tryGetSessionInfo function', function() {
    
-	var tgsiStub;
+	var tgsiSpy, lfcStub;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
 	var sessionId = 1234; 
 	var tenantId = 'tenantID'; 
-	chai.use(chaiAsPromised);
-	chai.should();
+	var session, regCourseAu, registration, courseAu;
 
 	beforeEach(() =>{
-		tgsiStub = sinon.stub(Session,'tryGetSessionInfo');
+		tgsiSpy = sinon.spy(Session, "tryGetSessionInfo")
+		lfcStub = sinon.stub(Session,'loadForChange');
 	});
 
 	afterEach(() =>{
-		tgsiStub.reset();
-		tgsiStub.restore();
+		tgsiSpy. restore();
+
+		lfcStub.reset();
+		lfcStub.restore();
 	});
 
-	it('calls the loadForChange function and waits for updated session information', async function()  {
+	it('calls the loadForChange function and waits for updated Session information', async function()  {
 		
-		lfcStub = sinon.stub(Session, 'loadForChange');
-		tgsiStub.callsFake(lfcStub.withArgs(txn, sessionId, tenantId).returns(Promise.resolve(txn, sessionId, tenantId)));
+		lfcStub.withArgs(txn, sessionId, tenantId).resolves({session, regCourseAu, registration, courseAu});
 
-		sessionInfo = await Session.loadForChange(txn, sessionId, tenantId);
+		queryResult = await Session.tryGetSessionInfo(txn, sessionId, tenantId);
 		
-		assert.equal(sessionInfo, txn, sessionId, tenantId)
-		expect(sessionInfo).to.equal(txn, sessionId, tenantId);
+		Session.tryGetSessionInfo.restore();
+		Session.loadForChange.restore();
+
+		expect(tgsiSpy.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+		expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+
+		expect(queryResult).to.eql({session, regCourseAu, registration, courseAu});//note use of 'eql' here. Values are same, reference is not
+		
 	});
 
-	it('catches and throws an error if the Session information was not retrieved successfully and rolls back transaction', async function() {
+	it('throws an error if it cannot retrieve,', async function (){
 		
-		tgsiStub.callsFake(() => Promise.reject('cant retrieve').then(txnRollback = true));
-		await expect(Session.tryGetSessionInfo(txn, sessionId, tenantId)).to.be.rejectedWith(`cant retrieve`);
-
-		if(txnRollback == true){
-			function error () {
-				throw Error(`Boom error (internal)`);
+		lfcStub.withArgs(txn, sessionId, tenantId).rejects('Boom error (internal)')
+		
+		try{
+			await Session.tryGetSessionInfo(txn, sessionId, tenantId);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			
+			function error () {	
+				txnRollback = true;		
+				throw new Error('Boom error (internal)');
 			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw('Boom error (internal)');
 		}
 
+		Session.tryGetSessionInfo.restore();
+		Session.loadForChange.restore();
+		
 		expect(txnRollback).to.be.true;
-		expect(error).to.throw('Boom error (internal)');
-	});
+
+		expect(tgsiSpy.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+
+		expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
+	})
 }),
 
 describe('Test of initializeDuration function', function() {
 
 	let durationSeconds;
-	sessionInitialized = true; //for test we assume true, not being intialized is covered in another func
-	sessionInitializedAt = new Date().getTime(); //mock session starting time
+	var session = {initialized_at: {getTime: ()=> {return new Date().getTime()+100000;} },
+				is_initialized: true,
+				}
 	
 	it(' checks if Session has been initialized and if true returns the duration since then', function (){
 		
-		if (sessionInitialized == true) {
-			
-			durationSeconds = (new Date().getTime() - sessionInitializedAt) / 1000;
-			
-			return durationSeconds; 
-		}
-		 
+		initDurSpy = sinon.spy(Session, 'initializeDuration');
+
+		durationSeconds = Session.initializeDuration(session);
+
+		 Session.initializeDuration.restore();
+
+		expect(initDurSpy.calledOnceWithExactly(session)).to.be.true;
+
 		assert.isDefined(durationSeconds);
 		assert.isNumber(durationSeconds);
 	});

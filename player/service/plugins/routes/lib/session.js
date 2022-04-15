@@ -34,7 +34,6 @@ module.exports = Session = {
 	},
 
 	getSession: async(sessionId, db) => {
-		console.log("In getSess func db is: ", db);
 		return await db
 			.first("*")
 			.from("sessions")
@@ -77,7 +76,6 @@ module.exports = Session = {
 
     tryGetQueryResult: async(txn, sessionId, tenantId) => { 
         try {
-            //console.log();
             return await Session.getQueryResult(txn, sessionId, tenantId);
             
         }
@@ -166,7 +164,7 @@ module.exports = Session = {
 
     initializeDuration(session) {
         let durationSeconds;
-
+        
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
         }
