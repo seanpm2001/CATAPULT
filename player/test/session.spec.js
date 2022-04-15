@@ -7,6 +7,7 @@ const Session = require('../service/plugins/routes/lib/session.js');//So Session
 const { assert } = require('chai');
 const proxyquire = require('proxyquire');
 const { load } = require('proxyquire');
+const Wreck = require("@hapi/wreck");
 const { initializeDuration } = require('../service/plugins/routes/lib/session.js');
 //const session = require('../service/plugins/routes/lib/session.js');
 var spy = sinon.spy;
@@ -445,7 +446,7 @@ describe('Test of initializeDuration function', function() {
 
 		durationSeconds = Session.initializeDuration(session);
 
-		 Session.initializeDuration.restore();
+		Session.initializeDuration.restore();
 
 		expect(initDurSpy.calledOnceWithExactly(session)).to.be.true;
 
@@ -455,94 +456,83 @@ describe('Test of initializeDuration function', function() {
 }),
 
 describe('Test of determineSessionTerminated function', async function() {
-   
-	var dstStub;
-	var txn = {}; //a transaction object
-	var txnRollback = false; //to track whether the mocked txn is rolled back
-	var session; 
-	chai.use(chaiAsPromised);
-	chai.should();
-
-	beforeEach(() =>{
-		dstStub = sinon.stub(Session,'determineSessionTerminated');
-	});
-
-	afterEach(() =>{
-		dstStub.reset();
-		dstStub.restore();
-	});
+	
+	var session = {is_terminated: true}
+	var txn = { rollback: ()=> {return true}  }; //a transaction object
 
 	it('checks the Session status, and if terminated, rolls back the txn (transaction object)', async function()  {
-		
-		dstStub.withArgs(session, txn).callsFake(() => Promise.resolve(txn).then(txnRollback = true));
+
+		dstSpy = sinon.spy(Session,'determineSessionTerminated');
 
 		sessionInfo = await Session.determineSessionTerminated(session, txn);
 		
-		expect(txnRollback).to.be.true;
+		Session.determineSessionTerminated.restore();
 
-		assert.equal(sessionInfo, txn)
-		expect(sessionInfo).to.equal(txn);
+		expect(txn.rollback()).to.equal(true);//determineSessionTerminated does not return a value itself, it just rollsback the transaction and returns to program execution
+		expect(dstSpy.calledOnceWithExactly(session, txn)).to.be.true;
+		
+		dstSpy.restore();
 	});
 }),
 
 describe('Test of determineSessionAbandoned function', async function() {
    
-	var dsaStub;
-	var txn = {}; //a transaction object
-	var txnRollback = false; //to track whether the mocked txn is rolled back
-	var session; 
-	chai.use(chaiAsPromised);
-	chai.should();
-
-	beforeEach(() =>{
-		dsaStub = sinon.stub(Session,'determineSessionAbandoned');
-	});
-
-	afterEach(() =>{
-		dsaStub.reset();
-		dsaStub.restore();
-	});
+	var session = {is_abandoned: true}
+	var txn = { rollback: ()=> {return true}  }; //a transaction object
 
 	it('checks the Session status, and if abandoned, rolls back the txn (transaction object)', async function()  {
-		
-		dsaStub.withArgs(session, txn).callsFake(() => Promise.resolve(txn).then(txnRollback = true));
+
+		dsaSpy = sinon.spy(Session,'determineSessionAbandoned');
 
 		sessionInfo = await Session.determineSessionAbandoned(session, txn);
 		
-		expect(txnRollback).to.be.true;
+		Session.determineSessionAbandoned.restore();
 
-		assert.equal(sessionInfo, txn)
-		expect(sessionInfo).to.equal(txn);
+		expect(txn.rollback()).to.equal(true);//determineSessionAbandoned does not return a value itself, it just rollsback the transaction and returns to program execution
+		expect(dsaSpy.calledOnceWithExactly(session, txn)).to.be.true;
+		
+		dsaSpy.restore();
 	});
 }),
 
-describe('Test of retrieveResponse function', function() {
+describe.only('Test of retrieveResponse function', function() {
    
-	var rrStub;
+	var rrSpy, wreckStub;
 	var txn = {}; //a transaction object
 	var txnRollback = false; //to track whether the mocked txn is rolled back
-	var durationSeconds, session, regCourseAu, registration, lrsWreck
+	var durationSeconds, session, regCourseAu, registration, 
+		lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }
 	var stResponse, stResponseBody
-	chai.use(chaiAsPromised);
-	chai.should();
 
 	beforeEach(() =>{
-		rrStub = sinon.stub(Session,'retrieveResponse');
+		rrSpy = sinon.spy(Session,'retrieveResponse');
+		wreckStub =sinon.stub(Wreck, 'read')
 	});
 
 	afterEach(() =>{
-		rrStub.reset();
-		rrStub.restore();
+		rrSpy.restore();
+
+		wreckStub.reset();
+		wreckStub.restore();
 	});
 
-	it('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
+	it.only('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
 		
-		rrStub.withArgs(durationSeconds, session, regCourseAu, registration, lrsWreck, txn).callsFake(() => (Promise.resolve(stResponse, {json: true})));
+		//rrStub.withArgs(durationSeconds, session, regCourseAu, registration, lrsWreck, txn).callsFake(() => (Promise.resolve(stResponse, {json: true})));
+		wreckStub.withArgs(stResponse, {json: true}).resolves("response body received")
+		
+		[stResponse, stResponseBody] = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
+		
+		Session.retrieveResponse.restore();
+		Wreck.read.restore();
 
-		stResponseBody = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
-		
-		assert.equal(stResponseBody, stResponse, {json: true})
-		expect(stResponseBody).to.equal(stResponse, {json: true});
+		expect(stResponse).to.equal("response received");
+		expect(stResponseBody).to.equal("response body received");
+
+		expect(rrSpy.calledOnceWithExactly(durationSeconds, session, regCourseAu, registration, lrsWreck, txn)).to.be.true;
+		expect(wreckStub.calledOnceWithExactly(stResponse, {json: true})).to.be.true;
+		//assert.equal(stResponseBody, stResponse, {json: true})
+		//expect(stResponseBody).to.equal(stResponse, {json: true});
 	});
 
 	it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function() {

@@ -164,7 +164,7 @@ module.exports = Session = {
 
     initializeDuration(session) {
         let durationSeconds;
-        
+
         if (session.is_initialized) {
             durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
         }
