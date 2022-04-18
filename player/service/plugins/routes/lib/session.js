@@ -243,7 +243,6 @@ module.exports = Session = {
         ),
 
         stResponseBody = await Wreck.read(stResponse, {json: true})
-
         return [stResponse, stResponseBody];
         
         } catch (ex) {
