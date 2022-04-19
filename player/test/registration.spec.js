@@ -10,7 +10,8 @@ const Wreck = require("@hapi/wreck");
 const lrs = require("../service/plugins/routes/lrs");
 
 const { v4: uuidv4 } = require("uuid"),
-    Boom = require("@hapi/boom")
+    Boom = require("@hapi/boom");
+const registration = require('../service/plugins/routes/lib/registration.js');
 var spy = sinon.spy;
 chai.use(chaiAsPromised);
 chai.should();
@@ -260,18 +261,86 @@ describe('Test of AUnodeSatisfied function', function() {
 	it('verifies the nodes "type" property is "au". If so it sets the "lmsId" and "satisified" properties and returns the "satisified property (called by isSatisfied)', async function()  {
 		
           node.type = "au";
+          node.lmsId =true;
+          auToSetSatisfied = true;
 
-		testNode =  await Registration.nodeSatisfied(node);
+		testNode =  await Registration.AUnodeSatisfied(node, {auToSetSatisfied});
           
-          Registration.nodeSatisfied.restore();
+          Registration.AUnodeSatisfied.restore();
 
-		expect(nodeSatisfiedSpy.calledOnceWithExactly(node)).to.be.true;
+		expect(auNodeSatisfiedSpy.calledOnceWithExactly(node, {auToSetSatisfied})).to.be.true;
 
           expect(testNode).to.be.true;
-
-          //expect(testStatement.lmsId).to.equal(lmsId);
-          //expect(testStatement.pubId).to.equal(0);
-          //expect(testStatement.type).to.equal("au");
-          //expect(testStatement.satisfied).to.equal(true);
 	})
+})
+describe('Test of loopThroughChildren function', function() {
+
+	var loopThroughChildrenSpy, isSatisfiedStub;
+	var child = {
+          lmsId: 0,
+          id: 0,
+          pubId: 1,
+          type: "au",
+          moveOn : "NotApplicable",
+          satisfied: true|false,
+          children: 0,
+          auToSetSatisfied :[ 1, 2 ], 
+          satisfiedStTemplate :[1, 2], 
+          lrsWreck:[1 ,2]
+          } 
+     var allChildrenSatisfied 
+     var  auToSetSatisfied = true|false;
+     var satisfiedStTemplate =true|false;
+     var lrsWreck = true| false;
+     var node = {children: "",}
+     
+	beforeEach(() =>{
+		isSatisfiedStub = sinon.stub(Registration, 'isSatisfied');
+		
+          loopThroughChildrenSpy = sinon.spy(Registration, "loopThroughChildren");
+
+	});
+
+	afterEach(() =>{
+		isSatisfiedStub.reset();
+		isSatisfiedStub.restore();
+
+		loopThroughChildrenSpy.restore();
+	});
+
+	it('recursively loops through a node and if any of the nodes children are unsatisified, it marks "allChildrenSatisifed false and returns that value" (called in isSatisifed function)', async function()  {
+		auToSetSatisfied = true;
+          satisfiedStTemplate = true;
+          lrsWreck = true;
+
+          isSatisfiedStub.withArgs(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}).resolves( false);
+		
+          test = await Registration.loopThroughChildren(node, allChildrenSatisfied, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
+          
+          allChildrenSatisfied = await Registration.isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
+          
+          Registration.loopThroughChildren.restore();
+          Registration.isSatisfied.restore();
+
+		expect(loopThroughChildrenSpy.calledOnceWithExactly(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})).to.be.true;
+
+          expect(allChildrenSatisfied).to.equal(false);
+	})
+
+	it.skip('if the .type of child is equal to "block", calls the map() to create array of elements and store in .children property', async function (){
+		
+          child.type ="block";
+          
+		testChild =  Registration.mapMoveOnChildren(child);
+          
+          Registration.mapMoveOnChildren.restore();
+
+		expect(moveOnChildrenSpy.calledOnceWithExactly(child)).to.be.true;
+
+          expect(testChild.lmsId).to.equal(0);
+		expect(testChild.pubId).to.equal(0);
+          expect(testChild.type).to.equal("block");
+          expect(testChild.satisfied).to.equal(true);
+	})
+
 })
