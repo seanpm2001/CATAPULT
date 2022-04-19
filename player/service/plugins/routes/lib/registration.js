@@ -73,9 +73,11 @@ module.exports = Registration = {
         }
     },
 
-    loopThroughChildren : async(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+    loopThroughChildren : async(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck) => {
+        let allChildrenSatisfied;
         for (const child of node.children) {
-            if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
+            console.log("first stop", isSatisfied)
+            if (! await isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck)) {
                 console.log("we here?")
                 allChildrenSatisfied = false;
             }
