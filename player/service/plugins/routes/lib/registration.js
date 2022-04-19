@@ -16,9 +16,12 @@ const lrs = require("../lrs");
 
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom"),
-    Wreck = require("@hapi/wreck"),
-    
-    mapMoveOnChildren = (child) => ({
+    Wreck = require("@hapi/wreck");
+    let Registration;
+
+module.exports = Registration = {  
+    //come back to this, not counted as function so can't be wrapped
+    mapMoveOnChildren : (child) => ({
         lmsId: child.lmsId,
         pubId: child.id,
         type: child.type,
@@ -26,7 +29,7 @@ const { v4: uuidv4 } = require("uuid"),
         ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
     }),
     
-    tryParseTemplate = ((satisfiedStTemplate) => {
+    tryParseTemplate : ((satisfiedStTemplate) => {
         let statement;
 
         try {
@@ -39,7 +42,7 @@ const { v4: uuidv4 } = require("uuid"),
         return statement;
     }),
 
-    assignStatementValues = ((node, statement) =>{
+    assignStatementValues : ((node, statement) =>{
         statement.id = uuidv4();
         statement.timestamp = new Date().toISOString();
         statement.object = {
@@ -55,13 +58,13 @@ const { v4: uuidv4 } = require("uuid"),
         ];
     }),
 
-    nodeSatisfied = async(node) =>  {
+    nodeSatisfied : async(node) =>  {
         if (node.satisfied) {
             return true;
         }
     },
 
-    AUnodeSatisfied = async(node, {auToSetSatisfied}) =>{
+    AUnodeSatisfied : async(node, {auToSetSatisfied}) =>{
         if (node.type === "au") {
             if (node.lmsId === auToSetSatisfied) {
                 node.satisfied = true;
@@ -70,7 +73,7 @@ const { v4: uuidv4 } = require("uuid"),
         }
     },
 
-    loopThroughChildren = async(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+    loopThroughChildren : async(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
         for (const child of node.children) {
             if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
                 allChildrenSatisfied = false;
@@ -79,7 +82,7 @@ const { v4: uuidv4 } = require("uuid"),
         return allChildrenSatisfied;
     },
 
-    retrieveResponse = async (lrsWreck, txn) => {
+    retrieveResponse : async (lrsWreck, txn) => {
         let satisfiedStResponse,
             satisfiedStResponseBody;
 
@@ -133,13 +136,13 @@ const { v4: uuidv4 } = require("uuid"),
         }
     },
 
-    checkStatusCode= async(satisfiedStResponse, satisfiedStResponseBody) => {
+    checkStatusCode: async(satisfiedStResponse, satisfiedStResponseBody) => {
         if (satisfiedStResponse.statusCode !== 200) {
             throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
         }
     },
 
-    isSatisfied = async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+    isSatisfied : async (node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
         
         await nodeSatisfied(node);
 
@@ -169,11 +172,9 @@ const { v4: uuidv4 } = require("uuid"),
             return true;
         }
         return false;
-    };
-    
-let Registration;
+    },
 
-module.exports = Registration = {
+
     create: async ({tenantId, courseId, actor, code = uuidv4()}, {db, lrsWreck}) => {
         let registrationId;
 
