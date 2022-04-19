@@ -20,7 +20,7 @@ const { v4: uuidv4 } = require("uuid"),
     let Registration;
 
 module.exports = Registration = {  
-    //come back to this, not counted as function so can't be wrapped
+
     mapMoveOnChildren : (child) => ({
         lmsId: child.lmsId,
         pubId: child.id,
