@@ -12,6 +12,7 @@ const lrs = require("../service/plugins/routes/lrs");
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom");
 const registration = require('../service/plugins/routes/lib/registration.js');
+const { isSatisfied } = require('../service/plugins/routes/lib/registration.js');
 var spy = sinon.spy;
 chai.use(chaiAsPromised);
 chai.should();
@@ -273,58 +274,40 @@ describe('Test of AUnodeSatisfied function', function() {
           expect(testNode).to.be.true;
 	})
 })
-describe('Test of loopThroughChildren function', function() {
-
-	var loopThroughChildrenSpy, isSatisfiedStub;
-	var child = {
-          lmsId: 0,
-          id: 0,
-          pubId: 1,
-          type: "au",
-          moveOn : "NotApplicable",
-          satisfied: true|false,
-          children: 0,
-          auToSetSatisfied :[ 1, 2 ], 
-          satisfiedStTemplate :[1, 2], 
-          lrsWreck:[1 ,2]
-          } 
-     var allChildrenSatisfied 
-     var  auToSetSatisfied = true|false;
-     var satisfiedStTemplate =true|false;
-     var lrsWreck = true| false;
-     var node = {children: "",}
+describe.only('Test of loopThroughChildren function', function() {
      
 	beforeEach(() =>{
-		isSatisfiedStub = sinon.stub(Registration, 'isSatisfied');
-		
-          loopThroughChildrenSpy = sinon.spy(Registration, "loopThroughChildren");
+          isSatisfiedStub = sinon.stub(Registration, "isSatisfied");
 
+          ltcSpy = sinon.spy(Registration, "loopThroughChildren")
 	});
 
 	afterEach(() =>{
-		isSatisfiedStub.reset();
-		isSatisfiedStub.restore();
+          isSatisfiedStub.reset();
+          isSatisfiedStub.restore();
 
-		loopThroughChildrenSpy.restore();
+          ltcSpy.restore();
 	});
 
 	it('recursively loops through a node and if any of the nodes children are unsatisified, it marks "allChildrenSatisifed false and returns that value" (called in isSatisifed function)', async function()  {
-		auToSetSatisfied = true;
-          satisfiedStTemplate = true;
-          lrsWreck = true;
-
-          isSatisfiedStub.withArgs(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}).resolves( false);
 		
-          test = await Registration.loopThroughChildren(node, allChildrenSatisfied, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
+          var auToSetSatisfied, satisfiedStTemplate, lrsWreck
+          var node = {
+               satisfied : true | false,
+               type: "",
+               lmsId: true|false,
+               children: [1, 2, 3, 4]
+               } 
           
-          allChildrenSatisfied = await Registration.isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
-          
-          Registration.loopThroughChildren.restore();
+          isSatisfiedStub.resolves(true);
+
+          simpleTest = await Registration.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
+
           Registration.isSatisfied.restore();
+          Registration.loopThroughChildren.restore();
 
-		expect(loopThroughChildrenSpy.calledOnceWithExactly(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})).to.be.true;
-
-          expect(allChildrenSatisfied).to.equal(false);
+          //this simple test should be true
+          expect(simpleTest).to.be.true;
 	})
 
 	it.skip('if the .type of child is equal to "block", calls the map() to create array of elements and store in .children property', async function (){
@@ -343,4 +326,63 @@ describe('Test of loopThroughChildren function', function() {
           expect(testChild.satisfied).to.equal(true);
 	})
 
+})
+describe('Test of retrieveResponse function', function() {
+   
+	var rrSpy, wreckStub;
+	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
+	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }
+	var satisfiedStResponse ="st response", satisfiedStResponseBody = "st response body"
+
+	beforeEach(() =>{
+		rrSpy = sinon.spy(Registration,'retrieveResponse');
+		wreckStub =sinon.stub(Wreck, 'read')
+	});
+
+	afterEach(() =>{
+		rrSpy.restore();
+
+		wreckStub.reset();
+		wreckStub.restore();
+	});
+
+	it('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
+		rrSpy.restore();//this is the only one we want to use a stub for, so take away spy
+		rrStub = sinon.stub(Registration, 'retrieveResponse');
+
+		rrStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
+		
+		[satisfiedStResponse, satisfiedStResponseBody] = await Registration.retrieveResponse(lrsWreck, txn);
+		
+		Registration.retrieveResponse.restore();
+
+		expect(satisfiedStResponse).to.equal("st response");
+		expect(satisfiedStResponseBody).to.equal("st response body");
+
+		expect(rrStub.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
+	});
+
+	it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function() {
+		
+		try{
+			await Registration.retrieveResponse(lrsWreck, txn);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			
+			function error () {	
+				txn.rollback = true;		
+				throw new Error(`Failed request to store abandoned statement: ${ex}`);
+			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw(`Failed request to store abandoned statement: ${ex}`);
+		}
+
+		Registration.retrieveResponse.restore();
+		
+		expect(txn.rollback).to.be.true;
+
+		expect(rrSpy.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
+	});
 })

@@ -17,9 +17,11 @@ const lrs = require("../lrs");
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom"),
     Wreck = require("@hapi/wreck");
-    let Registration;
+    
+    
+let Registration;
 
-module.exports = Registration = {  
+module.exports = Registration = {
 
     mapMoveOnChildren : (child) => ({
         lmsId: child.lmsId,
@@ -73,10 +75,9 @@ module.exports = Registration = {
         }
     },
 
-    loopThroughChildren : async(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck}) => {
+    loopThroughChildren : async(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck) => {
         for (const child of node.children) {
             if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
-                console.log("we here?")
                 allChildrenSatisfied = false;
             }
         }
@@ -155,7 +156,7 @@ module.exports = Registration = {
         // recursively check all children to see if they are satisfied
         let allChildrenSatisfied = true;
 
-        loopThroughChildren(node, {auToSetSatisfied, satisfiedStTemplate, lrsWreck});
+        loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
 
         if (allChildrenSatisfied) {
             node.satisfied = true;
@@ -174,7 +175,6 @@ module.exports = Registration = {
         }
         return false;
     },
-
 
     create: async ({tenantId, courseId, actor, code = uuidv4()}, {db, lrsWreck}) => {
         let registrationId;
