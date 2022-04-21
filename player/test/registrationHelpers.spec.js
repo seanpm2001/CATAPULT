@@ -458,11 +458,17 @@ describe.only('Test of isSatisfied function', function() {
           lmsId: true|false,
           children: [1, 2, 3, 4]
           } 
-          var auToSetSatisfied, satisfiedStTemplate, lrsWreck //passed as arguments
+          var auToSetSatisfied, satisfiedStTemplate, lrsWreck, statement, txn ={}, satisfiedStResponse, satisfiedStResponseBody //passed as arguments
+	
 	beforeEach(() =>{
 	     nodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'nodeSatisfied');
           AUnodeSatisfiedStub = sinon.stub(RegistrationHelpers, "AUnodeSatisfied");
           //isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfiedTrial")
+	     loopThroughChildrenStub = sinon.stub(RegistrationHelpers, 'loopThroughChildren');
+	     tryParseTemplateStub = sinon.stub(RegistrationHelpers, 'tryParseTemplate');
+		assignStatementValuesStub = sinon.stub(RegistrationHelpers, 'assignStatementValues');
+	     retrieveResponseStub = sinon.stub(RegistrationHelpers, 'retrieveResponse');
+	     checkStatusCodeStub = sinon.stub(RegistrationHelpers, 'checkStatusCode');
 
 		isSatisfiedSpy = sinon.spy(RegistrationHelpers, "isSatisfied");
 
@@ -475,6 +481,20 @@ describe.only('Test of isSatisfied function', function() {
           AUnodeSatisfiedStub.reset();
 		AUnodeSatisfiedStub.restore();
 
+		loopThroughChildrenStub.reset();
+		loopThroughChildrenStub.restore();
+
+		tryParseTemplateStub.reset();
+		tryParseTemplateStub.restore();
+
+		assignStatementValuesStub.reset();
+		assignStatementValuesStub.restore();
+
+		retrieveResponseStub.reset();
+		retrieveResponseStub.restore();
+
+		checkStatusCodeStub.reset();
+		checkStatusCodeStub.restore();
          // isSatisfiedStub.reset();
           //isSatisfiedStub.restore();
 
@@ -487,9 +507,14 @@ describe.only('Test of isSatisfied function', function() {
 	it('recursively iterates through node (given as param), ensuring all its children are satisified', async function()  {
           nodeSatisfiedStub.withArgs(node).resolves(true);
           AUnodeSatisfiedStub.withArgs(node, {auToSetSatisfied}).resolves(false);
-        //  isSatisfiedStub.resolves(false);
+          loopThroughChildrenStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
+		tryParseTemplateStub.withArgs(satisfiedStTemplate).resolves(statement);
+		assignStatementValuesStub.withArgs(node, statement).resolves(true);
+		retrieveResponseStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
+		checkStatusCodeStub.withArgs(satisfiedStResponse, satisfiedStResponseBody);		
+		//  isSatisfiedStub.resolves(false);
          
-          console.log("Here stub equals", nodeSatisfiedStub)
+          console.log("Here stub equals", nodeSatisfiedStub, txn)
           //returns true or false from main func, so this should be true or false?
           
           test = await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
@@ -499,7 +524,12 @@ describe.only('Test of isSatisfied function', function() {
           RegistrationHelpers.isSatisfied.restore();
           RegistrationHelpers.nodeSatisfied.restore();
           RegistrationHelpers.AUnodeSatisfied.restore();
-          RegistrationHelpers.isSatisfiedTrial.restore();
+		RegistrationHelpers.loopThroughChildren.restore();
+		RegistrationHelpers.tryParseTemplate.restore();
+		RegistrationHelpers.assignStatementValues.restore();
+		RegistrationHelpers.retrieveResponse.restore();
+		RegistrationHelpers.checkStatusCode.restore();
+
 	})
 
 })
