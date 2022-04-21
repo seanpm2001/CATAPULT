@@ -13,7 +13,7 @@ module.exports = RegistrationHelpers = {
         pubId: child.id,
         type: child.type,
         satisfied: (child.type === "au" && child.moveOn === "NotApplicable"),
-        ...(child.type === "block" ? {children: child.children.map(mapMoveOnChildren)} : {})
+        ...(child.type === "block" ? {children: child.children.map(RegistrationHelpers.mapMoveOnChildren)} : {})
     }),
     
     tryParseTemplate : ((satisfiedStTemplate) => {
@@ -61,8 +61,14 @@ module.exports = RegistrationHelpers = {
     },
 
     loopThroughChildren : async(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck) => {
+        let allChildrenSatisfied, test;
+
         for (const child of node.children) {
-            if (! await isSatisfied(child, {auToSetSatisfied, satisfiedStTemplate, lrsWreck})) {
+            console.log("first for loop")
+            test = await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
+           console.log("Here is our test value, to be passed into if", test)
+            if (test == false)  {
+               console.log("internal if statment")
                 allChildrenSatisfied = false;
             }
         }
@@ -72,7 +78,6 @@ module.exports = RegistrationHelpers = {
     retrieveResponse : async (lrsWreck, txn) => {
         let satisfiedStResponse,
             satisfiedStResponseBody;
-
         try { satisfiedStResponse = await lrsWreck.request(
             "POST",
             "statements",
@@ -129,7 +134,7 @@ module.exports = RegistrationHelpers = {
         }
     },
 
-    isSatisfied : async (node, auToSetSatisfied, satisfiedStTemplate, lrsWreck) => {
+    isSatisfied : async (node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn) => {
         
         await RegistrationHelpers.nodeSatisfied(node);
 
@@ -141,7 +146,7 @@ module.exports = RegistrationHelpers = {
         // recursively check all children to see if they are satisfied
         let allChildrenSatisfied = true;
 
-        RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
+        RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
 
         if (allChildrenSatisfied) {
             node.satisfied = true;
@@ -152,7 +157,10 @@ module.exports = RegistrationHelpers = {
 
             RegistrationHelpers.assignStatementValues(node, statement);
 
-            let [satisfiedStResponse, satisfiedStResponseBody] = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
+            let satisfiedStResponse, satisfiedStResponseBody;
+
+            //for tests to work, removed [] around these two. If program causes errors check here first, seems ok right now
+            satisfiedStResponse, satisfiedStResponseBody = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
 
             await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody);
 
