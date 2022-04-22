@@ -4,6 +4,8 @@ const chai = require ("chai"); //base chai
 const sinonChai = require("sinon-chai");
 const chaiAsPromised = require("chai-as-promised");
 const Registration = require('../service/plugins/routes/lib/registration.js');//So Session is exported, can we get it's function here through this?
+const RegistrationHelpers = require('../service/plugins/routes/lib/registrationHelpers.js');//So Session is exported, can we get it's function here through this?
+
 const { mapMoveOnChildren, tryParseTemplate, assignStatementValues, nodeSatisfied } = require ('../service/plugins/routes/lib/registration.js');
 const { assert } = require('chai');
 const Wreck = require("@hapi/wreck");
@@ -13,11 +15,13 @@ const { v4: uuidv4 } = require("uuid"),
 const { AUnodeSatisfied } = require('../service/plugins/routes/lib/registration.js');
 const { parse } = require('iso8601-duration');
 const { getQueryResult } = require('../service/plugins/routes/lib/session.js');
+const { json } = require('mocha/lib/reporters');
 var spy = sinon.spy;
-chai.use(chaiAsPromised);
+chai.use(sinonChai);
+
 chai.should();
 
-describe.only('Test of create function', async function() {
+describe('Test of create function', async function() {
 
 	var tenantId, courseId, actor, code =1000, lrsWreck, registrationId, course, courseAUs;
 	var createSpy, getCourseStub, getCourseAUsStub, getRegistrationStub, 
@@ -146,7 +150,7 @@ it('catches and throws an error if it is not able to update DB or return registr
 
 })
 
-describe.only('Test of getCourse function', function() {
+describe('Test of getCourse function', function() {
 
      var getCourseSpy; 
      var txn, tenantId, courseId;
@@ -163,7 +167,7 @@ describe.only('Test of getCourse function', function() {
           getCourseSpy.restore();
 	});
 
-	it('queries databse for course information', async function()  {
+	it('queries database for course information', async function()  {
 		
 		Registration.getCourse(txn, tenantId, courseId);
           //parseStub.withArgs(satisfiedStTemplate).returns('a parsed template');
@@ -175,7 +179,7 @@ describe.only('Test of getCourse function', function() {
 	})
 })
 
-describe.only('Test of getCourseAUs function', function() {
+describe('Test of getCourseAUs function', function() {
 
      var getCourseAUsSpy; 
      var txn, tenantId, courseId;
@@ -202,7 +206,7 @@ describe.only('Test of getCourseAUs function', function() {
 	})
 })
 
-describe.only('Test of load function', function() {
+describe('Test of load function', function() {
 
 	var loadSpy;
 	var tenantId, registrationId, db, loadAus = true, course, courseId, actor, code;
@@ -306,8 +310,69 @@ describe.only('Test of load function', function() {
 		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
 	})
 })
+describe('Test of loadRegistration', function() {
 
-describe.only('Test of loadAuForChange function', function() {
+	var loadRegistrationStub;
+	var db = {}; //a database object
+	var sessionId = 12345; 
+	var tenantId, registrationId; 
+
+	beforeEach(() =>{
+		loadRegistrationStub = sinon.stub(Registration,'loadRegistration');
+	});
+
+	afterEach(() =>{
+		loadRegistrationStub.reset();
+		loadRegistrationStub.restore();
+	});
+
+	it('returns database information, using registration id as match to query', async function (){
+		
+		loadRegistrationStub.callsFake(() => Promise.resolve(db));
+
+		queryResult = await Registration.loadRegistration(tenantId, registrationId, db);
+		
+		Registration.loadRegistration.restore();
+		
+		expect(loadRegistrationStub.calledOnceWithExactly(tenantId, registrationId, db)).to.be.true;
+
+		expect(queryResult).to.equal(db);
+		
+	});
+
+})
+describe('Test of loadRegistrationAus', function() {
+
+	var loadRegistrationAusStub;
+	var db = {}; //a database object
+	var sessionId = 12345; 
+	var tenantId, registrationId, registration; 
+
+	beforeEach(() =>{
+		loadRegistrationAusStub = sinon.stub(Registration,'loadRegistrationAus');
+	});
+
+	afterEach(() =>{
+		loadRegistrationAusStub.reset();
+		loadRegistrationAusStub.restore();
+	});
+
+	it('returns database information, using registration id and tenant id as match to query', async function (){
+		
+		loadRegistrationAusStub.callsFake(() => Promise.resolve(db));
+
+		queryResult = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration);
+		
+		Registration.loadRegistrationAus.restore();
+		
+		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
+
+		expect(queryResult).to.equal(db);
+		
+	});
+
+})
+describe('Test of loadAuForChange function', function() {
 
 	var loadAuForChangeSpy, getQueryResultStub;
 	var tenantId, registrationId, db, auIndex, txn, loadAus = true, course, courseId, actor, code;
@@ -409,356 +474,233 @@ describe.only('Test of loadAuForChange function', function() {
 		expect(getQueryResultStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
 	})
 })
-describe('Test of nodeSatisfied function', function() {
 
-	var nodeSatisfiedSpy, getSessionStub;
-	//var child=  sinon.spy(Registration, "");//stand in child object 
-	
-     var node = {
-          satisfied : true | false
-          }  
-     var testNode
+describe('Test of getQueryResult', function() {
+
+	var gqrStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var sessionId = 12345; 
+	var tenantId, auIndex, registrationId; 
 
 	beforeEach(() =>{
-		//getSessionStub = sinon.stub(Session, 'getSession');
-		nodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "nodeSatisfied");
-
+		gqrStub = sinon.stub(Registration,'getQueryResult');
 	});
 
 	afterEach(() =>{
-		//getSessionStub.reset();
-		//getSessionStub.restore();
-
-		nodeSatisfiedSpy.restore();
+		gqrStub.reset();
+		gqrStub.restore();
 	});
 
-	it('returns true if node it is passed satisified property is true (called by isSatisfied)', async function()  {
+	it('returns the txn(transaction) with requested table information if  match for args registrationId and tenantId are found in database', async function (){
 		
-          node.satisfied = true;
+		gqrStub.callsFake(() => Promise.resolve(txn));
 
-		testNode =  await RegistrationHelpers.nodeSatisfied(node);
-          
-          RegistrationHelpers.nodeSatisfied.restore();
+		queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
+		
+		Registration.getQueryResult.restore();
+		
+		expect(gqrStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
 
-		expect(nodeSatisfiedSpy.calledOnceWithExactly(node)).to.be.true;
+		expect(queryResult).to.equal(txn);
+		
+	});
 
-          expect(testNode).to.be.true;
-
-          //expect(testStatement.lmsId).to.equal(lmsId);
-          //expect(testStatement.pubId).to.equal(0);
-          //expect(testStatement.type).to.equal("au");
-          //expect(testStatement.satisfied).to.equal(true);
-	})
 })
-describe('Test of AUnodeSatisfied function', function() {
 
-	var auNodeSatisfiedSpy, getSessionStub;
-	
-     var node = {
-          satisfied : true|false,
-          type: "",
-          lmsId: true|false
-          }  
-     var testNode, auToSetSatisfied = true|false;
+describe('Test of interpretMoveOn', function() {
+	var interpretMoveOnSpy, templateToStringStub, isSatisfiedStub;
+	var txn = {}; //a transaction object
+	var txnRollback = false; //to track whether the mocked txn is rolled back
+	var sessionId = 12345; 
+	var registration = {
+		metadata: {
+			moveOn : true
+		},
+	} 
+	var auToSetSatisfied, sessionCode, lrsWreck, moveOn, satisfiedStTemplate; 
 
 	beforeEach(() =>{
-		//getSessionStub = sinon.stub(Session, 'getSession');
-		auNodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "AUnodeSatisfied");
+		interpretMoveOnSpy = sinon.spy(Registration,'interpretMoveOn');
 
+		templateToStringStub = sinon.stub(Registration, "templateToString");
+		isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfied");
 	});
 
 	afterEach(() =>{
-		//getSessionStub.reset();
-		//getSessionStub.restore();
+		interpretMoveOnSpy.restore();
 
-		auNodeSatisfiedSpy.restore();
+		templateToStringStub.reset();
+		templateToStringStub.restore();
+
+		isSatisfiedStub.reset();
+		isSatisfiedStub.restore();
 	});
 
-	it('verifies the nodes "type" property is "au". If so it sets the "lmsId" and "satisified" properties and returns the "satisified property (called by isSatisfied)', async function()  {
+	it('returns the txn(transaction) with requested table information if  match for args registrationId and tenantId are found in database', async function (){
 		
-          node.type = "au";
-          node.lmsId =true;
-          auToSetSatisfied = true;
+		templateToStringStub.withArgs(registration, sessionCode).returns(satisfiedStTemplate);
+		isSatisfiedStub.withArgs(moveOn =true , {auToSetSatisfied, lrsWreck, satisfiedStTemplate}).resolves(true);
 
-		testNode =  await RegistrationHelpers.AUnodeSatisfied(node, auToSetSatisfied);
+		moveOnResult = await Registration.interpretMoveOn(registration, {auToSetSatisfied, sessionCode, lrsWreck});
 
-		RegistrationHelpers.AUnodeSatisfied.restore();
+		Registration.interpretMoveOn.restore();
+		Registration.templateToString.restore();
+		RegistrationHelpers.isSatisfied.restore();
 
-		expect(auNodeSatisfiedSpy.calledOnceWithExactly(node, auToSetSatisfied)).to.be.true;
-
-          expect(testNode).to.be.true;
-	})
+		expect(interpretMoveOnSpy.calledOnceWithExactly(registration, {auToSetSatisfied, sessionCode, lrsWreck})).to.be.true;
+		expect(templateToStringStub.calledOnceWithExactly(registration, sessionCode)).to.be.true;
+		isSatisfiedStub.should.have.been.calledWith(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate})
+		//I chose a different form to verify isSatisfied test, as the'calledexactlywith' doesn't understand moveOn will
+		//be updated through interpretMoveOn function.
+		//Also this function does not return anything, so no need to test what moveOnResult is, only need it to start function
+	});
 })
-
-describe('Test of loopThroughChildren function', function() {
-     
-     var auToSetSatisfied, satisfiedStTemplate, lrsWreck
-     var node = {
-               satisfied : true | false,
-               type: "",
-               lmsId: true|false,
-               children: [1, 2, 3]
-               } 
-     var child, allChildrenSatisfied, txn
-	chai.use(sinonChai);
-
-	beforeEach(() =>{
-          isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfied");
-
-          ltcSpy = sinon.spy(RegistrationHelpers, "loopThroughChildren")
-	});
-
-	afterEach(() =>{
-          isSatisfiedStub.reset();
-          isSatisfiedStub.restore();
-
-          ltcSpy.restore();
-	});
-
-	it('recursively loops through a node and if any of the nodes children are unsatisified, it marks "allChildrenSatisifed false and returns that value" (called in isSatisifed function)', async function()  {
-		
-          isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false);
-
-		test = await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
-		console.log(test)
-
-          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
-
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.loopThroughChildren.restore();
-
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck)).to.be.true;
-          
-          //this should be called three times. There are three items in node.children
-		isSatisfiedStub.should.have.callCount(3);
-  		
-		expect(allChildrenSatisfied).to.be.false;
-		
-	})
-
-	it('recursively loops through a node and if all of the nodes children are satisified, it marks "allChildrenSatisifed" true and returns that value (called in isSatisifed function)', async function (){
-		
-          isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
-
-		test = await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
-		console.log(test)
-          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
-
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.loopThroughChildren.restore();
-
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck)).to.be.true;
-          
-         //this should be called three times. There are three items in node.children
-          expect(isSatisfiedStub.calledThrice).to.be.true
-
-          expect(allChildrenSatisfied).to.be.true;
-	})
-
-})
-describe('Test of retrieveResponse function', function() {
+describe('Test of templateToString function', function() {
    
-	var rrSpy, wreckStub;
-	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }
-	var satisfiedStResponse ="st response", satisfiedStResponseBody = "st response body"
-
+	var templateToStringSpy;
+	var sessionCode =100;
+	var registration = {
+		code: 0,
+		actor: 1
+	};
+	var actor = "registration.actor",
+		verb = {
+	    id: "https://w3id.org/xapi/adl/verbs/satisfied",
+	    display: {
+		   "en": "satisfied"
+	    		}
+		},
+	context = {
+	    registration: "registration.code",
+	    contextActivities: {
+		   category: [
+			  {
+				 id: "https://w3id.org/xapi/cmi5/context/categories/cmi5"
+			  }
+		   ],
+		   grouping: []
+	    },
+	    extensions: {
+		   "https://w3id.org/xapi/cmi5/context/extensions/sessionid": sessionCode
+	    }
+	}
+ 
 	beforeEach(() =>{
-		rrSpy = sinon.spy(RegistrationHelpers,'retrieveResponse');
-		wreckStub =sinon.stub(Wreck, 'read')
+		templateToStringSpy = sinon.spy(Registration, "templateToString");
 	});
 
 	afterEach(() =>{
-		rrSpy.restore();
-
-		wreckStub.reset();
-		wreckStub.restore();
+		templateToStringSpy. restore();
 	});
 
-	it('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
-		rrSpy.restore();//this is the only one we want to use a stub for, so take away spy
-		rrStub = sinon.stub(RegistrationHelpers, 'retrieveResponse');
-
-		rrStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
+	it('converts the template information (such as actor, or verb) to string', async function()  {
 		
-		[satisfiedStResponse, satisfiedStResponseBody] = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
+		result =  Registration.templateToString(registration, sessionCode, actor, verb, context);
 		
-		RegistrationHelpers.retrieveResponse.restore();
+		Registration.templateToString.restore();
 
-		expect(satisfiedStResponse).to.equal("st response");
-		expect(satisfiedStResponseBody).to.equal("st response body");
+		//because I had to pass other arguments for stringify to work, note the change from calledExactlyOnceWith
+		expect(templateToStringSpy.calledOnce).to.be.true;
+		expect(templateToStringSpy.calledWith(registration, sessionCode)).to.be.true;
+	
+		//I know this is long, but it actually allows the program to execute the stringify function, which is nice for code coverage.
+		//you can see our values in there for confirmation
+		expect(result).to.eql('{"actor":1,"verb":{"id":"https://w3id.org/xapi/adl/verbs/satisfied","display":{"en":"satisfied"}},"context":{"registration":0,"contextActivities":{"category":[{"id":"https://w3id.org/xapi/cmi5/context/categories/cmi5"}],"grouping":[]},"extensions":{"https://w3id.org/xapi/cmi5/context/extensions/sessionid":100}}}');
+	})
+})
+describe('Test of parseRegistrationData', function() {
 
-		expect(rrStub.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
+	var parseRegistrationDataSpy, retrieveRegStub;
+	var lrsWreck;
+	var registration ={
+		actor: "actor",
+		metadata: "metadata"
+	};
+
+	beforeEach(() =>{
+		parseRegistrationDataSpy = sinon.spy(Registration,'parseRegistrationData');
+
+		parseStub = sinon.stub(JSON, 'parse');
+		retrieveRegStub = sinon.stub(Registration, "retrieveRegistrationDataAsString");
 	});
 
-	it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function() {
+	afterEach(() =>{
+		parseRegistrationDataSpy.restore();
+
+		parseStub.reset();
+		parseStub.restore();
+
+		retrieveRegStub.reset();
+		retrieveRegStub.restore();
+	});
+
+	it("parses the actor and metadata of registration, then sends it to be converted to string (via retrieveRegistrationDataAsString). After returns registration", async function (){
 		
+		parseStub.withArgs(registration.actor).returns("actor");
+		parseStub.withArgs(registration.metadata).returns("metadata")
+
+		retrieveRegStub.withArgs(registration, lrsWreck).resolves(true);
+
+		queryResult = await Registration.parseRegistrationData(registration, lrsWreck);
+		
+		Registration.parseRegistrationData.restore();
+		Registration.retrieveRegistrationDataAsString.restore();
+
+		expect(parseRegistrationDataSpy.calledOnceWithExactly(registration, lrsWreck)).to.be.true;
+		expect(retrieveRegStub.calledOnceWithExactly(registration, lrsWreck)).to.be.true;
+
+		expect(queryResult).to.equal(registration)
+	});
+	it('catches and throws an error if it is not able to update registration data', async function (){
+	
+		retrieveRegStub.withArgs(registration, lrsWreck).rejects('Failed to interpret moveOn:');
+
 		try{
-			await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
+			await Registration.parseRegistrationData(registration, lrsWreck);
 			assert.fail(error);//ensure promise was rejected, ie no false positive test
 		}
 	  	catch (ex) {
 			
 			function error () {	
-				txn.rollback = true;		
-				throw new Error(`Failed request to store abandoned statement: ${ex}`);
+				throw new Error('Failed to interpret moveOn:');
 			}
 			
 			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw(`Failed request to store abandoned statement: ${ex}`);
+			expect(error).to.throw('Failed to interpret moveOn:');
 		}
 
-		RegistrationHelpers.retrieveResponse.restore();
-		
-		expect(txn.rollback).to.be.true;
+		Registration.parseRegistrationData.restore();
+		Registration.retrieveRegistrationDataAsString.restore();
 
-		expect(rrSpy.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
-	});
+		expect(parseRegistrationDataSpy.calledOnceWithExactly(registration, lrsWreck)).to.be.true;
+		expect(retrieveRegStub.calledOnceWithExactly(registration, lrsWreck)).to.be.true;
+	})
 })
-describe('Test of checkStatusCode function', function() {
-	
-	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var satisfiedStResponse ={ statusCode: 300 };
-	var satisfiedStResponseBody = 'response body'
+describe('Test of updateCourseAUmap', function() {
+
+	var updateCourseAUmapStub;
+	var txn, tenantId, registrationId, courseAUs;
 
 	beforeEach(() =>{
-		chkStatusSpy = sinon.spy(RegistrationHelpers, "checkStatusCode");
+		updateCourseAUmapStub = sinon.stub(Registration,'updateCourseAUmap');
 	});
 
 	afterEach(() =>{
-		chkStatusSpy.restore();
-	});
-	
-	
-	it(' checks if status code (from POST response in retrieveResponse) is equal to 200, if it is not, it throws an error.', async function (){
-
-		try{
-			await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody);
-			assert.fail(error);//ensure promise was rejected, ie no false positive test
-		}
-	  	catch (ex) {
-			
-			function error () {	
-				txn.rollback = true;		
-				throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-			}
-			
-			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-		}
-
-		RegistrationHelpers.checkStatusCode.restore();
-		
-		expect(txn.rollback).to.be.true;
-
-		expect(chkStatusSpy.calledOnceWithExactly(satisfiedStResponse, satisfiedStResponseBody)).to.be.true;
-	});
-})
-
-describe('Test of isSatisfied function', function() {
-
-	var isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
-          assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub;
-	//var child=  sinon.spy(Registration, "");//stand in child object 
-	var child = {
-          lmsId: 0,
-          id: 0,
-          pubId: 1,
-          type: "au",
-          moveOn : "NotApplicable",
-          satisfied: true|false,
-          children: [1, 2, 3, 4, 5],
-          } 
-     //////
-     var node = {
-          satisfied : true | false,
-          type: "",
-          lmsId: true|false,
-          children: [1, 2, 3, 4]
-          } 
-          var auToSetSatisfied, satisfiedStTemplate, lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }, statement, txn ={ rollback: ()=> {return true|false}  }, 
-			satisfiedStResponse = "a satisfied response", satisfiedStResponseBody ="satisfied response body" //passed as arguments
-	
-	beforeEach(() =>{
-	     nodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'nodeSatisfied');
-          AUnodeSatisfiedStub = sinon.stub(RegistrationHelpers, "AUnodeSatisfied");
-	     loopThroughChildrenStub = sinon.stub(RegistrationHelpers, 'loopThroughChildren');
-	     tryParseTemplateStub = sinon.stub(RegistrationHelpers, 'tryParseTemplate');
-		assignStatementValuesStub = sinon.stub(RegistrationHelpers, 'assignStatementValues');
-	     retrieveResponseStub = sinon.stub(RegistrationHelpers, 'retrieveResponse');
-	     checkStatusCodeStub = sinon.stub(RegistrationHelpers, 'checkStatusCode');
-
-		isSatisfiedSpy = sinon.spy(RegistrationHelpers, "isSatisfied");
-
+		updateCourseAUmapStub.reset();
+		updateCourseAUmapStub.restore();
 	});
 
-	afterEach(() =>{
-		nodeSatisfiedStub.reset();
-		nodeSatisfiedStub.restore();
+	it("attempts to update the transaction object with stringified metadata", async function (){
+		//need to stub out instead of spy since this is querying the txn object, which we can't mock
+		updateCourseAUmapStub.withArgs(txn, tenantId, registrationId, courseAUs).resolves(true);
 
-          AUnodeSatisfiedStub.reset();
-		AUnodeSatisfiedStub.restore();
+		updateResult = await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs);
+		
+		Registration.updateCourseAUmap.restore();
 
-		loopThroughChildrenStub.reset();
-		loopThroughChildrenStub.restore();
+		expect(updateCourseAUmapStub.calledOnceWithExactly(txn, tenantId, registrationId, courseAUs)).to.be.true;
 
-		tryParseTemplateStub.reset();
-		tryParseTemplateStub.restore();
-
-		assignStatementValuesStub.reset();
-		assignStatementValuesStub.restore();
-
-		retrieveResponseStub.reset();
-		retrieveResponseStub.restore();
-
-		checkStatusCodeStub.reset();
-		checkStatusCodeStub.restore();
-
-		isSatisfiedSpy.restore();
+		expect(updateResult).to.equal(true)
 	});
-
-	it('recursively iterates through node (given as param), ensuring all its children are satisified. When they are, returns true', async function()  {
-		
-		nodeSatisfiedStub.withArgs(node).resolves(true);
-          AUnodeSatisfiedStub.withArgs(node, {auToSetSatisfied}).resolves(false);
-          loopThroughChildrenStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
-		tryParseTemplateStub.withArgs(satisfiedStTemplate).resolves(statement);
-		assignStatementValuesStub.withArgs(node, statement).resolves(true);
-		retrieveResponseStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
-		checkStatusCodeStub.withArgs(satisfiedStResponse, satisfiedStResponseBody);		
-		
-		//satisfiedStResponse, satisfiedStResponseBody = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
-          
-          //returns true or false from main func, so this should be true or false?
-          allSatisfiedTest =  await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
-
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.nodeSatisfied.restore();
-          RegistrationHelpers.AUnodeSatisfied.restore();
-		RegistrationHelpers.loopThroughChildren.restore();
-		RegistrationHelpers.tryParseTemplate.restore();
-		RegistrationHelpers.assignStatementValues.restore();
-		RegistrationHelpers.retrieveResponse.restore();
-		RegistrationHelpers.checkStatusCode.restore();
-
-		expect(allSatisfiedTest).to.be.true;
-		//this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
-		expect(isSatisfiedSpy.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-	})
-	it('recursively iterates through node (given as param), ensuring all its children are satisified. If they cannot be, returns false', async function()  {
-		//Because of the nature of the recursion here, it really isn't possible to return false under normal circumstances,
-		//as the program will loop util satisified. So I have stubbed the function to make it return false
-		isSatisfiedSpy.restore();
-		isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfied")	
-		isSatisfiedStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false);
-		
-          //returns true or false from main func, so this should be true or false?
-          allSatisfiedTest =  await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
-
-          RegistrationHelpers.isSatisfied.restore();
-
-		expect(allSatisfiedTest).to.be.false;
-		//this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
-		expect(isSatisfiedStub.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-	})
 })

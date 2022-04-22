@@ -267,7 +267,7 @@ describe('Test of AUnodeSatisfied function', function() {
 	})
 })
 
-describe.only('Test of loopThroughChildren function', function() {
+describe.skip('Test of loopThroughChildren function', function() {
      
      var auToSetSatisfied, satisfiedStTemplate, lrsWreck
      var node = {
@@ -497,7 +497,7 @@ describe('Test of isSatisfied function', function() {
 	it('recursively iterates through node (given as param), ensuring all its children are satisified. When they are, returns true', async function()  {
 		
 		nodeSatisfiedStub.withArgs(node).resolves(true);
-          AUnodeSatisfiedStub.withArgs(node, {auToSetSatisfied}).resolves(false);
+          AUnodeSatisfiedStub.withArgs(node, {auToSetSatisfied}).resolves(true);
           loopThroughChildrenStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
 		tryParseTemplateStub.withArgs(satisfiedStTemplate).resolves(statement);
 		assignStatementValuesStub.withArgs(node, statement).resolves(true);
