@@ -21,7 +21,7 @@ const { v4: uuidv4 } = require("uuid"),
 let Registration;
 
 module.exports = Registration = {
-    create: async ({tenantId, courseId, actor, code = uuidv4()}, {db, lrsWreck}, txn) => {
+    create: async ({tenantId, courseId, actor, code = uuidv4()}, db, lrsWreck, txn) => {
         let registrationId;
 
         try {
@@ -201,7 +201,6 @@ module.exports = Registration = {
         if (moveOn.satisfied) {
             return;
         }
-
         await RegistrationHelpers.isSatisfied(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate});
     },
 
@@ -234,6 +233,7 @@ module.exports = Registration = {
     },
 
     retrieveRegistrationDataAsString: async(registration, lrsWreck) => {
+        
         return await Registration.interpretMoveOn(
             registration,
             {
