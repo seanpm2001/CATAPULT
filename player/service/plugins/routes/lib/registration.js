@@ -86,7 +86,7 @@ module.exports = Registration = {
         if (loadAus) {
             try {
                 registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration);
-            }
+        }
             catch (ex) {
                 throw new Error(`Failed to load registration AUs: ${ex}`);
             }
@@ -146,7 +146,6 @@ module.exports = Registration = {
             await txn.rollback();
             throw Boom.notFound(`registration: ${registrationId}`);
         }
-
         const {
             registrationsCoursesAus: regCourseAu,
             registrations: registration,

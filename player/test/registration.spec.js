@@ -12,6 +12,7 @@ const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom");
 const { AUnodeSatisfied } = require('../service/plugins/routes/lib/registration.js');
 const { parse } = require('iso8601-duration');
+const { getQueryResult } = require('../service/plugins/routes/lib/session.js');
 var spy = sinon.spy;
 chai.use(chaiAsPromised);
 chai.should();
@@ -279,84 +280,10 @@ describe.only('Test of load function', function() {
 
 	it('catches and throws an error if it is not able to update or return registration aus', async function (){
 	
-		loadRegistrationAusStub.withArgs(tenantId, registrationId, db, registration).rejects('Failed to load registration AUs:')
-		
-		try{
-			await Registration.load(tenantId, registrationId, db, loadAus = true);
-			assert.fail(error);//ensure promise was rejected, ie no false positive test
-		}
-	  	catch (ex) {
-			
-			function error () {	
-				throw new Error('Failed to load registration AUs:');
-			}
-			
-			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw('Failed to load registration AUs:');
-		}
+		let registration; //reset this variable as testing node can't compare it's children
 
-		Registration.load.restore();
-		Registration.loadRegistrationAus.restore();
-		
+		loadRegistrationAusStub.withArgs(tenantId, registrationId, db, registration).rejects('Failed to load registration:');
 
-		expect(loadSpy.calledOnceWithExactly(tenantId, registrationId, db, loadAus = true)).to.be.true;
-		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
-
-	})
-})
-
-describe.skip('Test of load function', function() {
-
-	var loadSpy;
-	var tenantId, registrationId, db, loadAus = true, course, courseId, actor, code;
-	var registration ={
-		aus : null
-	};
-	var db; //mock db item to pass in. Needs to be undefined, because the one in source code will be when test runs
-	var dbReturn ={}//mock db item to return
-
-	beforeEach(() =>{
-		loadSpy = sinon.spy(Registration, "load");
-
-		loadRegistrationStub = sinon.stub(Registration, "loadRegistration");
-		loadRegistrationAusStub = sinon.stub(Registration, "loadRegistrationAus");
-
-	});
-
-	afterEach(() =>{
-		loadSpy.restore();
-
-		loadRegistrationStub.reset();
-		loadRegistrationStub.restore();
-
-		loadRegistrationAusStub.reset();
-		loadRegistrationAusStub.restore();
-	});
-
-	it('attempts to load registration information', async function()  {
-		
-		loadRegistrationStub.withArgs(tenantId, registrationId, db).resolves(registration);
-		loadRegistrationAusStub.withArgs(tenantId, registrationId, db, registration).resolves(dbReturn);
-
-		loadAus = true
-		registrationTest = await Registration.load(tenantId, registrationId, db, loadAus);
-
-          Registration.load.restore();
-		Registration.loadRegistration.restore();
-		Registration.loadRegistrationAus.restore();
-
-		expect(loadSpy.calledOnceWithExactly(tenantId, registrationId, db, loadAus)).to.be.true;
-		expect(loadRegistrationStub.calledOnceWithExactly(tenantId, registrationId, db)).to.be.true;
-		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
-
-          expect(registrationTest).to.equal(registration);
-		expect(registrationTest.aus).to.equal(dbReturn);
-	})
-
-	it('catches and throws an error if it is not able to update or return registration', async function (){
-	
-		loadRegistrationStub.withArgs(tenantId, registrationId, db).rejects('Failed to load registration:')
-		
 		try{
 			await Registration.load(tenantId, registrationId, db, loadAus = true);
 			assert.fail(error);//ensure promise was rejected, ie no false positive test
@@ -372,13 +299,114 @@ describe.skip('Test of load function', function() {
 		}
 
 		Registration.load.restore();
-		Registration.loadRegistration.restore();
+		Registration.loadRegistrationAus.restore();
 		
 
 		expect(loadSpy.calledOnceWithExactly(tenantId, registrationId, db, loadAus = true)).to.be.true;
+		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
+	})
+})
 
-		expect(loadRegistrationStub.calledOnceWithExactly(tenantId, registrationId, db)).to.be.true;
+describe.only('Test of loadAuForChange function', function() {
+
+	var loadAuForChangeSpy, getQueryResultStub;
+	var tenantId, registrationId, db, auIndex, txn, loadAus = true, course, courseId, actor, code;
+	var queryResult = 
+		{//Stand in for Session values that are returned
+			registrationsCoursesAus : regCourseAu = {courseAu:0 },
+			registrations : 3,
+			coursesAus : 4}
+	var db; //mock db item to pass in. Needs to be undefined, because the one in source code will be when test runs
+	var dbReturn ={}//mock db item to return
+	var txn = { rollback: ()=> {return true|false}  };
+
+	beforeEach(() =>{
+		loadAuForChangeSpy = sinon.spy(Registration, "loadAuForChange");
+
+		getQueryResultStub = sinon.stub(Registration, "getQueryResult");
+
+	});
+
+	afterEach(() =>{
+		loadAuForChangeSpy.restore();
+
+		getQueryResultStub.reset();
+		getQueryResultStub.restore();
+	});
+
+	it('attempts to retrieve the transaction information with a query, and assigns collected info to registration variables', async function()  {
 		
+		getQueryResultStub.withArgs(txn, registrationId, auIndex, tenantId).resolves(queryResult);
+
+		queryTest = await Registration.loadAuForChange(txn, registrationId, auIndex, tenantId);
+
+          Registration.loadAuForChange.restore();
+		Registration.getQueryResult.restore();
+
+		expect(loadAuForChangeSpy.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
+		expect(getQueryResultStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
+
+		//note use of 'eql' here. Values are same, reference is not
+          expect(queryTest).to.eql({regCourseAu: {courseAu: 4}, registration: 3, courseAu: 4});
+	})
+
+	it('catches and throws an error if it is not able to retrieve the registration info through its query, rolling back transaction', async function (){
+		
+		getQueryResultStub.withArgs(txn, registrationId, auIndex, tenantId).rejects('Failed to select registration course AU, registration and course AU for update:')
+		
+		try{
+			await Registration.loadAuForChange(txn, registrationId, auIndex, tenantId);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			
+			function error () {	
+				txn.rollback = true;		
+				throw new Error('Failed to select registration course AU, registration and course AU for update:');
+			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw('Failed to select registration course AU, registration and course AU for update:');
+		}
+
+		Registration.loadAuForChange.restore();
+		Registration.getQueryResult.restore();
+		
+		expect(txn.rollback).to.be.true;
+
+		expect(loadAuForChangeSpy.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
+
+		expect(getQueryResultStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
+	})
+
+
+	it('catches and throws an error if retreived query result is false (no registration id), rolling back transaction', async function (){
+		
+		getQueryResultStub.withArgs(txn, registrationId, auIndex, tenantId).resolves(queryResult = false);
+		
+		try{
+			await Registration.loadAuForChange(txn, registrationId, auIndex, tenantId);
+			assert.fail(error);//ensure promise was rejected, ie no false positive test
+		}
+	  	catch (ex) {
+			
+			function error () {	
+				txn.rollback = true;		
+				throw new Error('registration:');
+			}
+			
+			//error has to be wrapped and tested here, or it will throw and interrupt test execution
+			expect(error).to.throw('registration:');
+		}
+
+		Registration.loadAuForChange.restore();
+		Registration.getQueryResult.restore();
+		
+		expect(txn.rollback).to.be.true;
+
+		expect(loadAuForChangeSpy.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
+
+		expect(getQueryResultStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
 	})
 })
 describe('Test of nodeSatisfied function', function() {
