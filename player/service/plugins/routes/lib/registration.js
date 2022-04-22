@@ -21,17 +21,34 @@ const { v4: uuidv4 } = require("uuid"),
 let Registration;
 
 module.exports = Registration = {
-    create: async ({tenantId, courseId, actor, code = uuidv4()}, {db, lrsWreck}) => {
+    create: async ({tenantId, courseId, actor, code = uuidv4()}, {db, lrsWreck}, txn) => {
         let registrationId;
 
         try {
+            console.log("Sooo, how to enter?", db)
             await db.transaction(
                 async (txn) => {
+                    console.log("are we here?")
                     const course = await Registration.getCourse(txn, tenantId, courseId),
                         courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
-                        registration = await Registration.getRegistration(course, {tenantId, courseId, actor, code}),
+                        registration = {
+                            tenantId,
+                            code,
+                            courseId,
+                            actor: JSON.stringify(actor),
+                            metadata: JSON.stringify({
+                                version: 1,
+                                moveOn: {
+                                    type: "course",
+                                    lmsId: course.lmsId,
+                                    pubId: course.structure.course.id,
+                                    satisfied: false,
+                                    children: course.structure.course.children.map(mapMoveOnChildren)
+                                }
+                            })
+                        },
                         regResult = await txn("registrations").insert(registration);
-
+                   console.log("have we come this far?")
                     registrationId = registration.id = regResult[0];
 
                     await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
@@ -45,42 +62,22 @@ module.exports = Registration = {
         catch (ex) {
             throw Boom.internal(new Error(`Failed to store registration: ${ex}`));
         }
-
+        console.log("Here regid is :", registrationId)
         return registrationId;
     },
-    ///lets try these to help with cluster of function makings constants
+
     getCourse:async(txn, tenantId, courseId) => {
         return await txn.first("*").from("courses").queryContext({jsonCols: ["metadata", "structure"]}).where({tenantId, id: courseId});
     },
     getCourseAUs:async(txn, tenantId, courseId) => {
         return await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId});
     },
-    getRegistration: async(course, {tenantId, courseId, actor, code})=>{
-        let registration = {
-            tenantId,
-            code,
-            courseId,
-            actor: JSON.stringify(actor),
-            metadata: JSON.stringify({
-                version: 1,
-                moveOn: {
-                    type: "course",
-                    lmsId: course.lmsId,
-                    pubId: course.structure.course.id,
-                    satisfied: false,
-                    children: course.structure.course.children.map(mapMoveOnChildren)
-                }
-            })
-        }
-        return registration;
-    },
-
-    ///end create func, creaitng registration, or specifically registratioId, it looks like
-    load: async ({tenantId, registrationId}, {db, loadAus = true}) => {
+  
+    load: async (tenantId, registrationId, db, loadAus = true) => {
         let registration;
         ///changed below with loadRegistration
         try {
-            registration = await Registration.loadRegistration({tenantId, registrationId}, {db});
+            registration = await Registration.loadRegistration(tenantId, registrationId, db);
         }
         catch (ex) {
             throw new Error(`Failed to load registration: ${ex}`);
@@ -88,7 +85,7 @@ module.exports = Registration = {
 
         if (loadAus) {
             try {
-                registration.aus = await Registration.loadRegistrationAus({tenantId, registrationId}, {db}, registration);
+                registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration);
             }
             catch (ex) {
                 throw new Error(`Failed to load registration AUs: ${ex}`);
@@ -97,7 +94,7 @@ module.exports = Registration = {
         return registration;
     },
     ///To help above
-    loadRegistration: async({tenantId, registrationId}, {db}) => {
+    loadRegistration: async(tenantId, registrationId, db) => {
         return await db
         .first("*")
         .queryContext({jsonCols: ["actor", "metadata"]})
@@ -113,7 +110,8 @@ module.exports = Registration = {
         );
     },
     ///Above
-    loadRegistrationAus: async({tenantId, registrationId}, {db}, registration) =>{
+
+    loadRegistrationAus: async(tenantId, registrationId, db, registration) =>{
         /////welll, lets see
         //console.log("here in loadRegistrationAUs registration is: ", registration);
         return await db
