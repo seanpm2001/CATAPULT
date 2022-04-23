@@ -432,7 +432,7 @@ describe('Test of checkStatusCode function', function() {
 	});
 })
 
-describe('Test of isSatisfied function', function() {
+describe.only('Test of isSatisfied function', function() {
 
 	var isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
           assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub;
