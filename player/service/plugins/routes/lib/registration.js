@@ -25,10 +25,8 @@ module.exports = Registration = {
         let registrationId;
 
         try {
-            console.log("Sooo, how to enter?", db)
             await db.transaction(
                 async (txn) => {
-                    console.log("are we here?")
                     const course = await Registration.getCourse(txn, tenantId, courseId),
                         courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
                         registration = {
@@ -48,7 +46,6 @@ module.exports = Registration = {
                             })
                         },
                         regResult = await txn("registrations").insert(registration);
-                   console.log("have we come this far?")
                     registrationId = registration.id = regResult[0];
 
                     await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
@@ -62,7 +59,6 @@ module.exports = Registration = {
         catch (ex) {
             throw Boom.internal(new Error(`Failed to store registration: ${ex}`));
         }
-        console.log("Here regid is :", registrationId)
         return registrationId;
     },
 

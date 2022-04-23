@@ -1,4 +1,4 @@
-const { expect } =require('chai'); //utilize chai assertion library 'expect'
+const { expect, should } =require('chai'); //utilize chai assertion library 'expect'
 const sinon = require('sinon'); //base sinon
 const chai = require ("chai"); //base chai
 const sinonChai = require("sinon-chai");
@@ -21,83 +21,93 @@ chai.use(sinonChai);
 
 chai.should();
 
-describe.only('Test of create function', async function() {
+describe('Test of create function', async function() {
 
-	var tenantId, courseId, actor, code =1000, lrsWreck, registrationId, registration,
-	course ={lmsId: 0,
-
-		structure: {course:{id:0}, 
+	var tenantId, courseId, actor, code =1000, lrsWreck, registrationId, course, registration, courseAUs, registrations
+	var txn = function (arg){
+		txn.insert = (arg) => {return [1, 2,3]},
+		txn.course = 
+			{ lmsId: 0,
+				structure: { course: {id:0}, 
 					children: {map : () => {return 1}}
-
-		}
-	 }, 
-	courseAUs;
-	var createSpy, getCourseStub, getCourseAUsStub, getRegistrationStub, 
-			updateCourseAUmapStub, parseRegistrationDataStub, updateMetadataStub;
-	var db = {  why: "otsure",
-		transaction: async () => {
-		    course,courseAUs,
-			   registration = {
-				  tenantId,
-				  code,
-				  courseId,
-				  actor: JSON.stringify(actor),
-				  metadata: JSON.stringify({
-					 version: 1,
-					 moveOn: {
-						type: "course",
-						lmsId: course.lmsId,
-						pubId: course.structure.course.id,
-						satisfied: false,
-						children: {course: {structure: {course: {children: {map : () => {return 1}}}}}}
-					 }
-				  })
-			   },
-			  // regResult = await txn("registrations").insert(registration);
-		   console.log("have we come this far?")
-		    //registrationId = registration.id = regResult[0];
-
-		//    await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
-
-		  //  await Registration.parseRegistrationData(registration, lrsWreck);
-		    
-		    //await Registration.updateMetadata(txn, registration, tenantId);
-		}
-	 
+					}
+	 		},
+	 	txn.registration = {
+				tenantId: 0,
+				code: 0 ,
+				courseId: 0 ,
+				actor: "JSON.stringify(actor)" ,
+				metadata: {
+				version: 1,
+				moveOn: {
+					type: "course",
+					lmsId: "course.lmsId",
+					pubId: "course.structure.course.id",
+					satisfied: false,
+					children: "course.structure.course.children.map(mapMoveOnChildren)"
+				}
+			}
+	 	}
+		txn.registrations = { insert: (args) => {return args} } 
 	};
 
-	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var ex;
-	/*var db = {
-		course: 0,
-		courseAUs: 0,
-		registration: {
-			id: 0
-		},
-		regResult: "au",
-		transaction:(
-			/*async (txn) => {
-			    const course = await Registration.getCourse(txn, tenantId, courseId),
-				   courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
-				   registration = await Registration.getRegistration(course, {tenantId, courseId, actor, code}),
-				   regResult = await txn("registrations").insert(registration);
-			    registrationId = registration.id = regResult[0];
+	var createSpy, getCourseStub, getCourseAUsStub, getRegistrationStub, 
+			updateCourseAUmapStub, parseRegistrationDataStub, updateMetadataStub;
+	
+	var db = {transaction: (async () => {
+				const course = await Registration.getCourse(txn, tenantId, courseId),
+		    		courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
+			   	registration = {
+				 	tenantId,
+					code,
+					courseId,
+					actor: JSON.stringify(actor),
+					metadata: JSON.stringify({
+						version: 1,
+						moveOn: {
+							type: "course",
+							lmsId: course.lmsId,
+							pubId: course.structure.course.id,
+							satisfied: false,
+							children: {course: 
+								{structure: 
+									{course: 
+										{children: {map : () => {return 1}}
+									}
+								}
+							}
+						}
+					 }
+				  })
+			   }
+		// regResult = await txn("registrations").insert(registration);
+		
+		 //ORIGINAL CODE ABOVE, BUT NOT NEEDED FOR TEST
+		//registrationId = "Test return";
 
-			    await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
+		await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
 
-			    await Registration.parseRegistrationData(registration, lrsWreck);
-			    
-			    await Registration.updateMetadata(txn, registration, tenantId);
+		await Registration.parseRegistrationData(registration, lrsWreck);
+		    
+		await Registration.updateMetadata(txn, registration, tenantId);
+		
+		//mock return values (Currently not returning like it should :(
+		return await registrationId
+		    
+	
+		})
+	};
+
+	var course = {
+		lmsId:0,
+		structure: {
+			course: {
+				id: 0
 			}
-		 ) => {registrationId =2; return registrationId}
-	}*/
-	async function txn (arg = "registrations")  { console.log("betterquestion, is THIS being called>")
-		insert: (registration) => {return 100; console.log("is this being called?")}
-	}
+		} }, courseAUs; //a transaction object
 
 	beforeEach(() =>{
 		createSpy = sinon.spy(Registration, "create");
-
 		getCourseStub = sinon.stub(Registration, "getCourse");
 		getCourseAUsStub = sinon.stub(Registration, "getCourseAUs");
 		updateCourseAUmapStub = sinon.stub(Registration, "updateCourseAUmap");
@@ -126,33 +136,33 @@ describe.only('Test of create function', async function() {
 	});
 
 	//come back to this, may need to stub whole thing out, wil not use false db we created
-	it.only('updates the database with information from transaction and returns the registrationId', async function()  {
-		getCourseStub.withArgs(txn, tenantId, courseId).resolves(1);
-		getCourseAUsStub.withArgs(txn, tenantId, courseId).resolves(1);
+	it('updates the database with information from transaction and returns the registrationId', async function()  {
+		getCourseStub.withArgs(txn, tenantId, courseId).resolves(course);
+		getCourseAUsStub.withArgs(txn, tenantId, courseId).resolves(courseAUs);
 		updateCourseAUmapStub.withArgs(txn, tenantId, registrationId, courseAUs).resolves(true);
 		parseRegistrationDataStub.withArgs(registration, lrsWreck).resolves(true);
 		updateMetadataStub.withArgs(txn, registration, tenantId).resolves(true);
 		
-		testCreate =  await Registration.create({tenantId, courseId, actor, code}, db, lrsWreck, course);
+		testCreate =  await Registration.create({tenantId, courseId, actor, code}, db, lrsWreck, course, registration, txn);
 		
-		console.log(testCreate);
-
 		Registration.create.restore();
 		Registration.getCourse.restore();
 		Registration.updateCourseAUmap.restore();
 		Registration.parseRegistrationData.restore();
 		Registration.updateMetadata.restore();
-		//expect(createSpy.calledOnceWithExactly({tenantId, courseId, actor, code}, {db, lrsWreck})).to.be.true;
 		
+		console.log("test results", testCreate)
 		//because I had to pass other arguments for fake db.transaction to work, note the change from calledExactlyOnceWith
 		expect(createSpy.calledOnce).to.be.true;
-		//expect(createSpy.calledWith({tenantId, courseId, actor}, db, lrsWreck, txn)).to.be.true;
+		getCourseStub.should.have.been.calledOnceWithExactly(txn, tenantId, courseId);
+		getCourseAUsStub.should.have.been.calledOnceWithExactly(txn, tenantId, courseId);
+		updateCourseAUmapStub.should.have.been.calledOnceWithExactly(txn, tenantId, registrationId, courseAUs);
+		//These have different arguments called with, because function changes them. Test that as well, or enough to know they ran?
+		parseRegistrationDataStub.should.have.been.calledOnce;
+		updateMetadataStub.should.have.been.calledOnce;
 
-
-		//expect(testChild.lmsId).to.equal(0);
-		//expect(testChild.pubId).to.equal(0);
-		//expect(testChild.type).to.equal("au");
-		//expect(testChild.satisfied).to.equal(true);
+		//Because the db.transaction utilizes a query in the middle, I cannot seem to mock it. So despite my
+		//efforts to create a 'fake' query, we cannot seem to get it to return anything.
 	})
 
 it('catches and throws an error if it is not able to update DB or return registrationId', async function (){
