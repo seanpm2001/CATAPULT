@@ -62,13 +62,10 @@ module.exports = RegistrationHelpers = {
 
     loopThroughChildren : async(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn) => {
         let allChildrenSatisfied = true;
-        
+
         for (const child of node.children) {
-            console.log("first for loop")
-            if (! await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn));
+            if (! await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn))
            {
-                console.log("Here is our test value, to be passed into if", test)
-                console.log("internal if statment")
                 allChildrenSatisfied = false;
             }
         }
@@ -145,13 +142,8 @@ module.exports = RegistrationHelpers = {
         
         // recursively check all children to see if they are satisfied
         let allChildrenSatisfied = true;
-        
-        for (const child of node.children) {
-            if (! await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn));
-           {
-                allChildrenSatisfied = false;
-            }
-        }
+
+        RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
 
         if (allChildrenSatisfied) {
             node.satisfied = true;

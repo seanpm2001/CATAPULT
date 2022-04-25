@@ -134,7 +134,6 @@ describe('Test of tryParseTemplate function', function() {
 describe('Test of assignStatementValues function', function() {
 
 	var asvSpy, getSessionStub;
-	//var child=  sinon.spy(Registration, "");//stand in child object 
 	var statement = {
           id: 0,
           timestamp: 0,
@@ -160,15 +159,11 @@ describe('Test of assignStatementValues function', function() {
      var testStatement
 
 	beforeEach(() =>{
-		//getSessionStub = sinon.stub(Session, 'getSession');
 		asvSpy = sinon.spy(RegistrationHelpers, "assignStatementValues");
 
 	});
 
 	afterEach(() =>{
-		//getSessionStub.reset();
-		//getSessionStub.restore();
-
 		asvSpy.restore();
 	});
 
@@ -180,16 +175,11 @@ describe('Test of assignStatementValues function', function() {
 
 		expect(asvSpy.calledOnceWithExactly(node, statement)).to.be.true;
 
-          //expect(testStatement.lmsId).to.equal(lmsId);
-          //expect(testStatement.pubId).to.equal(0);
-          //expect(testStatement.type).to.equal("au");
-          //expect(testStatement.satisfied).to.equal(true);
 	})
 })
 describe('Test of nodeSatisfied function', function() {
 
-	var nodeSatisfiedSpy, getSessionStub;
-	//var child=  sinon.spy(Registration, "");//stand in child object 
+	var nodeSatisfiedSpy;
 	
      var node = {
           satisfied : true | false
@@ -197,15 +187,11 @@ describe('Test of nodeSatisfied function', function() {
      var testNode
 
 	beforeEach(() =>{
-		//getSessionStub = sinon.stub(Session, 'getSession');
 		nodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "nodeSatisfied");
 
 	});
 
 	afterEach(() =>{
-		//getSessionStub.reset();
-		//getSessionStub.restore();
-
 		nodeSatisfiedSpy.restore();
 	});
 
@@ -221,10 +207,6 @@ describe('Test of nodeSatisfied function', function() {
 
           expect(testNode).to.be.true;
 
-          //expect(testStatement.lmsId).to.equal(lmsId);
-          //expect(testStatement.pubId).to.equal(0);
-          //expect(testStatement.type).to.equal("au");
-          //expect(testStatement.satisfied).to.equal(true);
 	})
 })
 describe('Test of AUnodeSatisfied function', function() {
@@ -239,15 +221,11 @@ describe('Test of AUnodeSatisfied function', function() {
      var testNode, auToSetSatisfied = true|false;
 
 	beforeEach(() =>{
-		//getSessionStub = sinon.stub(Session, 'getSession');
 		auNodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "AUnodeSatisfied");
 
 	});
 
 	afterEach(() =>{
-		//getSessionStub.reset();
-		//getSessionStub.restore();
-
 		auNodeSatisfiedSpy.restore();
 	});
 
@@ -267,16 +245,17 @@ describe('Test of AUnodeSatisfied function', function() {
 	})
 })
 
-describe.skip('Test of loopThroughChildren function', function() {
+describe('Test of loopThroughChildren function', function() {
      
      var auToSetSatisfied, satisfiedStTemplate, lrsWreck
+	var child, allChildrenSatisfied, txn
      var node = {
                satisfied : true | false,
                type: "",
                lmsId: true|false,
-               children: [1, 2, 3]
+               children: [child, child, child]
                } 
-     var child, allChildrenSatisfied, txn
+     
 	chai.use(sinonChai);
 
 	beforeEach(() =>{
@@ -296,40 +275,36 @@ describe.skip('Test of loopThroughChildren function', function() {
 		
           isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false);
 
-		test = await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
-		console.log(test)
+          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
+
+          RegistrationHelpers.isSatisfied.restore();
+          RegistrationHelpers.loopThroughChildren.restore();
+
+          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
+          
+		//this should be called three times. There are three items in node.children
+		isSatisfiedStub.should.have.callCount(3);
+		isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
+  		
+		expect(allChildrenSatisfied).to.be.false;
+	})
+
+	it('recursively loops through a node and if all of the nodes children are satisified, it marks "allChildrenSatisifed" true and returns that value (called in isSatisifed function)', async function (){
+		
+		isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(true);
 
           allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
 
           RegistrationHelpers.isSatisfied.restore();
           RegistrationHelpers.loopThroughChildren.restore();
 
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck)).to.be.true;
+          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
           
-          //this should be called three times. There are three items in node.children
+		//this should be called three times. There are three items in node.children
 		isSatisfiedStub.should.have.callCount(3);
+		isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
   		
-		expect(allChildrenSatisfied).to.be.false;
-		
-	})
-
-	it('recursively loops through a node and if all of the nodes children are satisified, it marks "allChildrenSatisifed" true and returns that value (called in isSatisifed function)', async function (){
-		
-          isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
-
-		test = await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
-		console.log(test)
-          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck);
-
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.loopThroughChildren.restore();
-
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck)).to.be.true;
-          
-         //this should be called three times. There are three items in node.children
-          expect(isSatisfiedStub.calledThrice).to.be.true
-
-          expect(allChildrenSatisfied).to.be.true;
+		expect(allChildrenSatisfied).to.be.true;
 	})
 
 })
@@ -432,7 +407,7 @@ describe('Test of checkStatusCode function', function() {
 	});
 })
 
-describe.only('Test of isSatisfied function', function() {
+describe('Test of isSatisfied function', function() {
 
 	var isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
           assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub;
@@ -451,8 +426,9 @@ describe.only('Test of isSatisfied function', function() {
           satisfied : true | false,
           type: "",
           lmsId: true|false,
-          children: [1, 2, 3, 4]
+          children: [child, child, child]
           } 
+		
           var auToSetSatisfied, satisfiedStTemplate, lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }, statement, txn ={ rollback: ()=> {return true|false}  }, 
 			satisfiedStResponse = "a satisfied response", satisfiedStResponseBody ="satisfied response body" //passed as arguments
 	
@@ -504,8 +480,6 @@ describe.only('Test of isSatisfied function', function() {
 		retrieveResponseStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
 		checkStatusCodeStub.withArgs(satisfiedStResponse, satisfiedStResponseBody);		
 		
-		//satisfiedStResponse, satisfiedStResponseBody = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
-          
           //returns true or false from main func, so this should be true or false?
           allSatisfiedTest =  await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
 
