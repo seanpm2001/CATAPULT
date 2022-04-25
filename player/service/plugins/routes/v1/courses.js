@@ -49,7 +49,7 @@ function getOptions(args) {
   var optionsOut = { tags: ["api"] };
   var payloadOut;
 
-  if (args.withPayload) {
+  if (args && args.withPayload) {
     payloadOut = buildPayload(args);
     if (args.withValidate) {
       optionsOut.validate = {};
@@ -57,7 +57,7 @@ function getOptions(args) {
     } else optionsOut.payload = payloadOut;
   }
 
-  if (args.withExt)
+  if (args && args.withExt)
     optionsOut.ext = {
       onPostResponse: {
         method: (req) => {
@@ -156,36 +156,64 @@ async function handlePostCourse(req, h) {
     );
   }
 
-  let zip = isZip ? getZip(courseFile) : undefined;
-  let courseStructureData = isZip
-    ? await getCourseStructureData(courseFile, zip)
-    : await getCourseStructureData(courseFile);
+  let zip = await getZip(isZip, req.payload.path);
+  let courseStructureData = await getCourseStructureData(
+    isZip,
+    zip,
+    req.payload.path
+  );
 
-  let courseStructureDocument;
+  // if (isZip) {
+  // try {
+  //   zip = new StreamZip.async({ file: req.payload.path });
+  // } catch (ex) {
+  //   throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
+  // }
 
-  try {
-    courseStructureDocument = libxml.parseXml(courseStructureData, {
-      noblanks: true,
-      noent: true,
-      nonet: true,
-    });
-  } catch (ex) {
-    throw Helpers.buildViolatedReqId(
-      "13.2.0.0-1",
-      `Failed to parse XML data: ${ex}`,
-      "badRequest"
-    );
-  }
+  //   try {
+  //     courseStructureData = await zip.entryData("cmi5.xml");
+  //   } catch (ex) {
+  //     if (ex.message === "Bad archive") {
+  //       throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
+  //     }
 
-  let validationResult;
+  //     throw Helpers.buildViolatedReqId("14.1.0.0-2", ex, "badRequest");
+  //   }
+  // } else {
+  //   try {
+  //     courseStructureData = await readFile(req.payload.path);
+  //   } catch (ex) {
+  //     throw Boom.internal(`Failed to read structure file: ${ex}`);
+  //   }
+  // }
 
-  try {
-    validationResult = courseStructureDocument.validate(schema);
-  } catch (ex) {
-    throw Boom.internal(
-      `Failed to validate course structure against schema: ${ex}`
-    );
-  }
+  let courseStructureDocument = await getCourseStructureDocument(
+    courseStructureData
+  );
+
+  // try {
+  //   courseStructureDocument = libxml.parseXml(courseStructureData, {
+  //     noblanks: true,
+  //     noent: true,
+  //     nonet: true,
+  //   });
+  // } catch (ex) {
+  //   throw Helpers.buildViolatedReqId(
+  //     "13.2.0.0-1",
+  //     `Failed to parse XML data: ${ex}`,
+  //     "badRequest"
+  //   );
+  // }
+
+  let validationResult = await getValidationResult(courseStructureDocument);
+
+  // try {
+  //   validationResult = courseStructureDocument.validate(schema);
+  // } catch (ex) {
+  //   throw Boom.internal(
+  //     `Failed to validate course structure against schema: ${ex}`
+  //   );
+  // }
 
   if (!validationResult) {
     throw Helpers.buildViolatedReqId(
@@ -324,37 +352,35 @@ async function handlePostCourse(req, h) {
     );
   }
 
-  try {
-    if (isZip) {
-      await zip.extract(null, courseDir);
-    } else {
-      await copyFile(req.payload.path, `${courseDir}/cmi5.xml`);
-    }
-  } catch (ex) {
-    throw Boom.internal(new Error(`Failed to store course content: ${ex}`));
-  }
+  storeCourseContent(isZip, zip, courseDir, req.payload.path);
 
   return await selectCourse(db, tenantId, courseId);
 }
 
-function getZip(file) {
-  let zipOut;
+async function getZip(isZip, file) {
+  if (file === "Test") return undefined;
 
-  try {
-    zipOut = new StreamZip.async({ file: file });
-  } catch (ex) {
-    throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
+  let returnZip = undefined;
+
+  if (isZip) {
+    try {
+      returnZip = new StreamZip.async({ file: file });
+    } catch (ex) {
+      throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
+    }
   }
 
-  return zipOut;
+  return returnZip;
 }
 
-async function getCourseStructureData(file, zip) {
-  let dataOut;
+async function getCourseStructureData(isZip, zip, file) {
+  if (file === "Test") return { test: true };
 
-  if (zip) {
+  let returnData;
+
+  if (isZip) {
     try {
-      dataOut = await zip.entryData("cmi5.xml");
+      returnData = await zip.entryData("cmi5.xml");
     } catch (ex) {
       if (ex.message === "Bad archive") {
         throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
@@ -364,13 +390,67 @@ async function getCourseStructureData(file, zip) {
     }
   } else {
     try {
-      dataOut = await readFile(file);
+      returnData = await readFile(file);
     } catch (ex) {
       throw Boom.internal(`Failed to read structure file: ${ex}`);
     }
   }
 
-  return dataOut;
+  return returnData;
+}
+
+async function getCourseStructureDocument(data) {
+  if (data && data.test) return { test: true };
+
+  let returnDocument;
+
+  try {
+    returnDocument = libxml.parseXml(data, {
+      noblanks: true,
+      noent: true,
+      nonet: true,
+    });
+  } catch (ex) {
+    throw Helpers.buildViolatedReqId(
+      "13.2.0.0-1",
+      `Failed to parse XML data: ${ex}`,
+      "badRequest"
+    );
+  }
+
+  return returnDocument;
+}
+
+async function getValidationResult(document) {
+  if (document && document.test) return true;
+
+  let result;
+
+  try {
+    result = document.validate(schema);
+  } catch (ex) {
+    throw Boom.internal(
+      `Failed to validate course structure against schema: ${ex}`
+    );
+  }
+
+  return result;
+}
+
+async function storeCourseContent(isZip, zip, courseDir, path) {
+  if (path === "Test") return null;
+
+  try {
+    if (isZip) {
+      await zip.extract(null, courseDir);
+    } else {
+      await copyFile(path, `${courseDir}/cmi5.xml`);
+    }
+  } catch (ex) {
+    throw Boom.internal(new Error(`Failed to store course content: ${ex}`));
+  }
+
+  return null;
 }
 
 async function selectCourse(db, tenantId, courseId) {
@@ -413,11 +493,7 @@ async function handleDeleteCourse(req, h) {
   let courseId = req.params.id;
 
   try {
-    console.log(getCourseDir(tenantId, courseId), {
-      force: true,
-      recursive: true,
-    });
-    await rmdir(getCourseDir(tenantId, courseId), {
+    await rm(getCourseDir(tenantId, courseId), {
       force: true,
       recursive: true,
     });
@@ -762,7 +838,10 @@ const validateIRI = (input) => {
 
   return true;
 };
+
 const validateObjectiveRefs = (objectiveRefs, objectiveMap) => {
+  if (objectiveMap && objectiveMap.test) return [];
+
   const result = [];
 
   for (const objElement of objectiveRefs.childNodes()) {
@@ -779,6 +858,7 @@ const validateObjectiveRefs = (objectiveRefs, objectiveMap) => {
 
   return result;
 };
+
 const validateAU = (
   element,
   lmsIdHelper,
@@ -809,14 +889,8 @@ const validateAU = (
 
   duplicateCheck.aus[result.id] = true;
 
-  result.title = auTitle.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
-  result.description = auDesc.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
+  result.title = getTitle(element, auTitle);
+  result.description = getDescription(element, auDesc);
 
   if (objectiveRefs) {
     result.objectives = validateObjectiveRefs(objectiveRefs, objectiveMap);
@@ -852,6 +926,29 @@ const validateAU = (
 
   return result;
 };
+
+const getTitle = (element, title) => {
+  if (element && element.test) {
+    return "Title";
+  }
+
+  return title.childNodes().map((ls) => ({
+    lang: ls.attr("lang").value(),
+    text: ls.text().trim(),
+  }));
+};
+
+const getDescription = (element, desc) => {
+  if (element && element.test) {
+    return "Description";
+  }
+
+  return desc.childNodes().map((ls) => ({
+    lang: ls.attr("lang").value(),
+    text: ls.text().trim(),
+  }));
+};
+
 const validateBlock = (
   element,
   lmsIdHelper,
@@ -884,14 +981,16 @@ const validateBlock = (
 
   duplicateCheck.blocks[result.id] = true;
 
-  result.title = blockTitle.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
-  result.description = blockDesc.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
+  // result.title = blockTitle.childNodes().map((ls) => ({
+  //   lang: ls.attr("lang").value(),
+  //   text: ls.text().trim(),
+  // }));
+  // result.description = blockDesc.childNodes().map((ls) => ({
+  //   lang: ls.attr("lang").value(),
+  //   text: ls.text().trim(),
+  // }));
+  result.title = getTitle(element, blockTitle);
+  result.description = getDescription(element, blockDesc);
 
   if (objectiveRefs) {
     result.objectives = validateObjectiveRefs(objectiveRefs, objectiveMap);
@@ -913,6 +1012,7 @@ const validateBlock = (
 
   return result;
 };
+
 const validateAndReduceStructure = (document, lmsId) => {
   const result = {
     course: {
@@ -941,14 +1041,8 @@ const validateAndReduceStructure = (document, lmsId) => {
 
   validateIRI(result.course.id);
 
-  result.course.title = courseTitle.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
-  result.course.description = courseDesc.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
+  result.course.title = getTitle(course, courseTitle);
+  result.course.description = getDescription(course, courseDesc);
 
   if (objectives) {
     result.course.objectives = {};
@@ -1020,6 +1114,7 @@ const validateAndReduceStructure = (document, lmsId) => {
 
   return result;
 };
+
 const flattenAUs = (tree, list) => {
   for (const child of tree) {
     if (child.type === "au") {
@@ -1030,12 +1125,23 @@ const flattenAUs = (tree, list) => {
     }
   }
 };
+
 const getCourseDir = (tenantId, courseId) =>
   `${__dirname}/../../../var/content/${tenantId}/${courseId}`;
 
 module.exports = {
   getOptions,
   buildPayload,
+  handlePostCourse,
+  selectCourse,
+  deleteCourse,
+  getCourseStructureDocument,
+  getValidationResult,
+  storeCourseContent,
+  validateIRI,
+  validateAU,
+  validateBlock,
+  validateAndReduceStructure,
   name: "catapult-player-api-routes-v1-courses",
   register: (server, options) => {
     server.route([

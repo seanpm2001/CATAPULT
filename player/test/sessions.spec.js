@@ -10,12 +10,47 @@ var Wreck = require("@hapi/wreck");
 
 describe("handleSessionTest", function() {
   let req, h;
+  req = {
+    auth: {
+      credentials: {
+        tenantId: "tenantId",
+      },
+    },
+    params: {
+      id: "1234",
+    },
+    server: {
+      app: {
+        db: {
+          first: function() {
+            return {
+              from: function() {
+                return {
+                  where: function() {
+                    return {
+                      queryContext: function() {
+                        return {};
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        },
+      },
+      methods: {
+        lrsWreckDefaults: function() {
+          return {};
+        },
+      },
+    },
+  };
+  h = null;
+  let args = {
+    doAbandon: true,
+  };
   let result = {};
-
-  beforeEach(async () => {
-    req = {};
-    h = null;
-  });
 
   afterEach(() => {
     sinon.restore();
@@ -42,5 +77,15 @@ describe("handleSessionTest", function() {
     });
 
     expect(test).to.be.eql(null);
+  });
+
+  it("handleSession returns a loaded session when requested with valid input", async function() {
+    var sessionSpy = sinon.spy(sessions, "handleSession");
+
+    var test = await sessions.handleSession(req, h);
+
+    expect(sessionSpy.calledOnceWithExactly(req, h)).to.be.true;
+    expect(sessionSpy).to.not.throw();
+    expect(test).to.eql(result);
   });
 });

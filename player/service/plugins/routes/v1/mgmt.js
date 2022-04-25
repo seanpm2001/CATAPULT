@@ -23,30 +23,17 @@ const { v4: uuidv4 } = require("uuid");
 function getOptions(args) {
   var optionsOut = { tags: ["api"] };
 
-<<<<<<< Updated upstream
   if (args && args.withAuth) optionsOut.auth = "basic";
   if (args && args.withValidate) optionsOut.validate = buildPayload(args);
-=======
-  if (args.withAuth) optionsOut.auth = "basic";
-  if (args.withValidate) optionsOut.validate = buildPayload(args.requestAuth);
->>>>>>> Stashed changes
 
   return optionsOut;
 }
 
-<<<<<<< Updated upstream
 function buildPayload(args) {
   var payloadOut = {};
   var payloadObj;
 
   if (args && args.requestAuth)
-=======
-function buildPayload(requestAuth) {
-  var payloadOut = {};
-  var payloadObj;
-
-  if (requestAuth)
->>>>>>> Stashed changes
     payloadObj = Joi.object({
       tenantId: Joi.number().required(),
       audience: Joi.string().required(),
@@ -138,6 +125,7 @@ async function tryGetTenant(app, tenantId) {
 
 async function getTenant(app, tenantId) {
   let tenant = await app
+    .db("tenants")
     .first("id")
     .from("tenants")
     .where({ id: tenantId });
@@ -160,11 +148,16 @@ function generateToken(app, audience, tenantId) {
 }
 
 module.exports = {
-<<<<<<< Updated upstream
   getOptions,
   buildPayload,
-=======
->>>>>>> Stashed changes
+  handleTenantCreate,
+  tryCreateTenant,
+  createTenant,
+  handleTenantDelete,
+  tryDeleteTenant,
+  deleteTenant,
+  handleAuthToken,
+  getTenant,
   name: "catapult-player-api-routes-v1-mgmt",
   register: (server, options) => {
     server.route([

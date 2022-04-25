@@ -34,7 +34,7 @@ async function handleSession(req, h, args) {
     return null;
   }
 
-  var result = await Session.load(sessionId, tenantId, { db });
+  var result = await Session.load(sessionId, db);
 
   if (!result) {
     return Boom.notFound();
