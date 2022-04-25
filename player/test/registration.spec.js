@@ -5,21 +5,12 @@ const sinonChai = require("sinon-chai");
 const chaiAsPromised = require("chai-as-promised");
 const Registration = require('../service/plugins/routes/lib/registration.js');//So Session is exported, can we get it's function here through this?
 const RegistrationHelpers = require('../service/plugins/routes/lib/registrationHelpers.js');//So Session is exported, can we get it's function here through this?
-
-const { mapMoveOnChildren, tryParseTemplate, assignStatementValues, nodeSatisfied } = require ('../service/plugins/routes/lib/registration.js');
 const { assert } = require('chai');
-const Wreck = require("@hapi/wreck");
-const lrs = require("../service/plugins/routes/lrs");
-const { v4: uuidv4 } = require("uuid"),
-    Boom = require("@hapi/boom");
-const { AUnodeSatisfied } = require('../service/plugins/routes/lib/registration.js');
-const { parse } = require('iso8601-duration');
-const { getQueryResult } = require('../service/plugins/routes/lib/session.js');
-const { json } = require('mocha/lib/reporters');
 var spy = sinon.spy;
 chai.use(sinonChai);
-
 chai.should();
+
+const knex = require("knex");
 
 describe('Test of create function', async function() {
 
@@ -91,10 +82,7 @@ describe('Test of create function', async function() {
 		    
 		await Registration.updateMetadata(txn, registration, tenantId);
 		
-		//mock return values (Currently not returning like it should :(
 		return await registrationId
-		    
-	
 		})
 	};
 
@@ -105,7 +93,6 @@ describe('Test of create function', async function() {
 				id: 0
 			}
 		} }, courseAUs; //a transaction object
-
 	beforeEach(() =>{
 		createSpy = sinon.spy(Registration, "create");
 		getCourseStub = sinon.stub(Registration, "getCourse");
@@ -135,8 +122,9 @@ describe('Test of create function', async function() {
 		updateMetadataStub.restore();
 	});
 
-	//come back to this, may need to stub whole thing out, wil not use false db we created
+	//come back to this, may need to stub whole thing out, will not use false db we created
 	it('updates the database with information from transaction and returns the registrationId', async function()  {
+		
 		getCourseStub.withArgs(txn, tenantId, courseId).resolves(course);
 		getCourseAUsStub.withArgs(txn, tenantId, courseId).resolves(courseAUs);
 		updateCourseAUmapStub.withArgs(txn, tenantId, registrationId, courseAUs).resolves(true);
@@ -151,13 +139,11 @@ describe('Test of create function', async function() {
 		Registration.parseRegistrationData.restore();
 		Registration.updateMetadata.restore();
 		
-		console.log("test results", testCreate)
-		//because I had to pass other arguments for fake db.transaction to work, note the change from calledExactlyOnceWith
 		expect(createSpy.calledOnce).to.be.true;
 		getCourseStub.should.have.been.calledOnceWithExactly(txn, tenantId, courseId);
 		getCourseAUsStub.should.have.been.calledOnceWithExactly(txn, tenantId, courseId);
 		updateCourseAUmapStub.should.have.been.calledOnceWithExactly(txn, tenantId, registrationId, courseAUs);
-		//These have different arguments called with, because function changes them. Test that as well, or enough to know they ran?
+		
 		parseRegistrationDataStub.should.have.been.calledOnce;
 		updateMetadataStub.should.have.been.calledOnce;
 
@@ -171,9 +157,6 @@ it('catches and throws an error if it is not able to update DB or return registr
 	createStub = sinon.stub(Registration, "create")
 	
 	createStub.withArgs({tenantId, courseId, actor, code}, {db, lrsWreck}, txn).rejects(`Failed to store registration: `);
-		
-	
-	
 	try {
 		await Registration.create({tenantId, courseId, actor, code}, {db, lrsWreck}, txn);
 		assert.fail(error); //ensure promise was rejected, ie no false positive
@@ -200,22 +183,16 @@ describe('Test of getCourse function', function() {
      var txn, tenantId, courseId;
 
      beforeEach(() =>{
-		//parseStub = sinon.stub(JSON, 'parse')
 		getCourseSpy = sinon.spy(Registration, 'getCourse');
 	});
 
 	afterEach(() =>{
-		//parseStub.reset();
-		//parseStub.restore();
-
           getCourseSpy.restore();
 	});
 
 	it('queries database for course information', async function()  {
 		
 		Registration.getCourse(txn, tenantId, courseId);
-          //parseStub.withArgs(satisfiedStTemplate).returns('a parsed template');
-          //statement =  RegistrationHelpers.tryParseTemplate(satisfiedStTemplate);
 
           Registration.getCourse.restore();
 		
@@ -229,14 +206,10 @@ describe('Test of getCourseAUs function', function() {
      var txn, tenantId, courseId;
 
      beforeEach(() =>{
-		//parseStub = sinon.stub(JSON, 'parse')
 		getCourseAUsSpy = sinon.spy(Registration, 'getCourseAUs');
 	});
 
 	afterEach(() =>{
-		//parseStub.reset();
-		//parseStub.restore();
-
           getCourseAUsSpy.restore();
 	});
 
@@ -318,7 +291,6 @@ describe('Test of load function', function() {
 
 		Registration.load.restore();
 		Registration.loadRegistration.restore();
-		
 
 		expect(loadSpy.calledOnceWithExactly(tenantId, registrationId, db, loadAus = true)).to.be.true;
 
@@ -348,7 +320,6 @@ describe('Test of load function', function() {
 
 		Registration.load.restore();
 		Registration.loadRegistrationAus.restore();
-		
 
 		expect(loadSpy.calledOnceWithExactly(tenantId, registrationId, db, loadAus = true)).to.be.true;
 		expect(loadRegistrationAusStub.calledOnceWithExactly(tenantId, registrationId, db, registration)).to.be.true;
@@ -358,7 +329,6 @@ describe('Test of loadRegistration', function() {
 
 	var loadRegistrationStub;
 	var db = {}; //a database object
-	var sessionId = 12345; 
 	var tenantId, registrationId; 
 
 	beforeEach(() =>{
@@ -387,10 +357,8 @@ describe('Test of loadRegistration', function() {
 })
 describe('Test of loadRegistrationAus', function() {
 
-	var loadRegistrationAusStub;
+	var loadRegistrationAusStub, tenantId, registrationId, registration;
 	var db = {}; //a database object
-	var sessionId = 12345; 
-	var tenantId, registrationId, registration; 
 
 	beforeEach(() =>{
 		loadRegistrationAusStub = sinon.stub(Registration,'loadRegistrationAus');
@@ -414,26 +382,21 @@ describe('Test of loadRegistrationAus', function() {
 		expect(queryResult).to.equal(db);
 		
 	});
-
 })
 describe('Test of loadAuForChange function', function() {
 
-	var loadAuForChangeSpy, getQueryResultStub;
-	var tenantId, registrationId, db, auIndex, txn, loadAus = true, course, courseId, actor, code;
+	var loadAuForChangeSpy, getQueryResultStub, tenantId, registrationId, auIndex, txn;
 	var queryResult = 
 		{//Stand in for Session values that are returned
 			registrationsCoursesAus : regCourseAu = {courseAu:0 },
 			registrations : 3,
 			coursesAus : 4}
-	var db; //mock db item to pass in. Needs to be undefined, because the one in source code will be when test runs
-	var dbReturn ={}//mock db item to return
 	var txn = { rollback: ()=> {return true|false}  };
 
 	beforeEach(() =>{
 		loadAuForChangeSpy = sinon.spy(Registration, "loadAuForChange");
 
 		getQueryResultStub = sinon.stub(Registration, "getQueryResult");
-
 	});
 
 	afterEach(() =>{
@@ -488,7 +451,6 @@ describe('Test of loadAuForChange function', function() {
 		expect(getQueryResultStub.calledOnceWithExactly(txn, registrationId, auIndex, tenantId)).to.be.true;
 	})
 
-
 	it('catches and throws an error if retreived query result is false (no registration id), rolling back transaction', async function (){
 		
 		getQueryResultStub.withArgs(txn, registrationId, auIndex, tenantId).resolves(queryResult = false);
@@ -521,11 +483,8 @@ describe('Test of loadAuForChange function', function() {
 
 describe('Test of getQueryResult', function() {
 
-	var gqrStub;
+	var gqrStub, tenantId, auIndex, registrationId;
 	var txn = {}; //a transaction object
-	var txnRollback = false; //to track whether the mocked txn is rolled back
-	var sessionId = 12345; 
-	var tenantId, auIndex, registrationId; 
 
 	beforeEach(() =>{
 		gqrStub = sinon.stub(Registration,'getQueryResult');
@@ -553,16 +512,12 @@ describe('Test of getQueryResult', function() {
 })
 
 describe('Test of interpretMoveOn', function() {
-	var interpretMoveOnSpy, templateToStringStub, isSatisfiedStub;
-	var txn = {}; //a transaction object
-	var txnRollback = false; //to track whether the mocked txn is rolled back
-	var sessionId = 12345; 
+	var interpretMoveOnSpy, templateToStringStub, isSatisfiedStub, auToSetSatisfied, sessionCode, lrsWreck, moveOn, satisfiedStTemplate;
 	var registration = {
 		metadata: {
 			moveOn : true
 		},
-	} 
-	var auToSetSatisfied, sessionCode, lrsWreck, moveOn, satisfiedStTemplate; 
+	}  
 
 	beforeEach(() =>{
 		interpretMoveOnSpy = sinon.spy(Registration,'interpretMoveOn');

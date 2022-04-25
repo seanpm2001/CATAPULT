@@ -584,9 +584,9 @@ describe('Test of checkStatusCode function', function() {
 describe('Test of txnUpdate function', function() {
    
 	var txnUpdateStub;
-	var session
+	var session;
 	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var tenantId, by
+	var tenantId, by;
 
 	it("uses the transaction objects 'update' and 'where' functions to update the Session", async function()  {
 		

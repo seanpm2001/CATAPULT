@@ -1,5 +1,4 @@
 const lrs = require("../lrs");
-
 const { v4: uuidv4 } = require("uuid"),
     Boom = require("@hapi/boom"),
     Wreck = require("@hapi/wreck");
@@ -30,6 +29,7 @@ module.exports = RegistrationHelpers = {
     }),
 
     assignStatementValues : ((node, statement) =>{
+        
         statement.id = uuidv4();
         statement.timestamp = new Date().toISOString();
         statement.object = {
@@ -75,6 +75,7 @@ module.exports = RegistrationHelpers = {
     retrieveResponse : async (lrsWreck, txn) => {
         let satisfiedStResponse,
             satisfiedStResponseBody;
+        
         try { satisfiedStResponse = await lrsWreck.request(
             "POST",
             "statements",

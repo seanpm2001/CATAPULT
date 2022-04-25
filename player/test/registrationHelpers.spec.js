@@ -4,20 +4,15 @@ const chai = require ("chai"); //base chai
 const sinonChai = require("sinon-chai");
 const chaiAsPromised = require("chai-as-promised");
 const RegistrationHelpers = require('../service/plugins/routes/lib/registrationHelpers.js');//So Session is exported, can we get it's function here through this?
-const { mapMoveOnChildren, tryParseTemplate, assignStatementValues, nodeSatisfied } = require ('../service/plugins/routes/lib/registration.js');
 const { assert } = require('chai');
 const Wreck = require("@hapi/wreck");
-const lrs = require("../service/plugins/routes/lrs");
-const { v4: uuidv4 } = require("uuid"),
-    Boom = require("@hapi/boom");
-const { AUnodeSatisfied } = require('../service/plugins/routes/lib/registration.js');
 var spy = sinon.spy;
 chai.use(chaiAsPromised);
 chai.should();
 
 describe('Test of mapMoveOnChildren function', function() {
 
-	var moveOnChildrenSpy;
+	var moveOnChildrenSpy, testChild;
 
 	var child = {
           lmsId: 0,
@@ -27,8 +22,7 @@ describe('Test of mapMoveOnChildren function', function() {
           moveOn : "NotApplicable",
           satisfied: true|false,
           children: {map: () => {return this.satisfied = true}},
-          } 
-     var testChild
+          };
 
 	beforeEach(() =>{
 		moveOnChildrenSpy = sinon.spy(RegistrationHelpers, "mapMoveOnChildren");
@@ -67,25 +61,20 @@ describe('Test of mapMoveOnChildren function', function() {
           expect(testChild.type).to.equal("block");
           expect(testChild.children).to.equal(true);
 	})
-
 })
 
 describe('Test of tryParseTemplate function', function() {
 
-	var tptSpy, parseStub;
-     var statement; 
-     var satisfiedStTemplate ;
+	var tptSpy, parseStub, statement, satisfiedStTemplate;
 
      beforeEach(() =>{
 		parseStub = sinon.stub(JSON, 'parse')
 		tptSpy = sinon.spy(RegistrationHelpers, 'tryParseTemplate');
-
 	});
 
 	afterEach(() =>{
 		parseStub.reset();
 		parseStub.restore();
-
           tptSpy.restore();
 	});
 
@@ -128,12 +117,11 @@ describe('Test of tryParseTemplate function', function() {
 
 		expect(parseStub.calledOnceWithExactly(satisfiedStTemplate)).to.be.true;
      })
-
 })
 
 describe('Test of assignStatementValues function', function() {
 
-	var asvSpy, getSessionStub;
+	var asvSpy;
 	var statement = {
           id: 0,
           timestamp: 0,
@@ -156,11 +144,9 @@ describe('Test of assignStatementValues function', function() {
           type: "au",
           pubId: 0,
           }  
-     var testStatement
 
 	beforeEach(() =>{
 		asvSpy = sinon.spy(RegistrationHelpers, "assignStatementValues");
-
 	});
 
 	afterEach(() =>{
@@ -174,21 +160,19 @@ describe('Test of assignStatementValues function', function() {
           RegistrationHelpers.assignStatementValues.restore();
 
 		expect(asvSpy.calledOnceWithExactly(node, statement)).to.be.true;
-
 	})
 })
+
 describe('Test of nodeSatisfied function', function() {
 
-	var nodeSatisfiedSpy;
+	var nodeSatisfiedSpy, testNode;
 	
      var node = {
           satisfied : true | false
           }  
-     var testNode
-
+     
 	beforeEach(() =>{
 		nodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "nodeSatisfied");
-
 	});
 
 	afterEach(() =>{
@@ -209,9 +193,10 @@ describe('Test of nodeSatisfied function', function() {
 
 	})
 })
+
 describe('Test of AUnodeSatisfied function', function() {
 
-	var auNodeSatisfiedSpy, getSessionStub;
+	var auNodeSatisfiedSpy;
 	
      var node = {
           satisfied : true|false,
@@ -222,7 +207,6 @@ describe('Test of AUnodeSatisfied function', function() {
 
 	beforeEach(() =>{
 		auNodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "AUnodeSatisfied");
-
 	});
 
 	afterEach(() =>{
@@ -232,7 +216,7 @@ describe('Test of AUnodeSatisfied function', function() {
 	it('verifies the nodes "type" property is "au". If so it sets the "lmsId" and "satisified" properties and returns the "satisified property (called by isSatisfied)', async function()  {
 		
           node.type = "au";
-          node.lmsId =true;
+          node.lmsId = true;
           auToSetSatisfied = true;
 
 		testNode =  await RegistrationHelpers.AUnodeSatisfied(node, auToSetSatisfied);
@@ -247,15 +231,13 @@ describe('Test of AUnodeSatisfied function', function() {
 
 describe('Test of loopThroughChildren function', function() {
      
-     var auToSetSatisfied, satisfiedStTemplate, lrsWreck
-	var child, allChildrenSatisfied, txn
+     var auToSetSatisfied, satisfiedStTemplate, lrsWreck, child, allChildrenSatisfied, txn;
      var node = {
                satisfied : true | false,
                type: "",
                lmsId: true|false,
                children: [child, child, child]
                } 
-     
 	chai.use(sinonChai);
 
 	beforeEach(() =>{
@@ -306,14 +288,14 @@ describe('Test of loopThroughChildren function', function() {
   		
 		expect(allChildrenSatisfied).to.be.true;
 	})
-
 })
+
 describe('Test of retrieveResponse function', function() {
    
 	var rrSpy, wreckStub;
 	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }
-	var satisfiedStResponse ="st response", satisfiedStResponseBody = "st response body"
+	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} };
+	var satisfiedStResponse ="st response", satisfiedStResponseBody = "st response body";
 
 	beforeEach(() =>{
 		rrSpy = sinon.spy(RegistrationHelpers,'retrieveResponse');
@@ -367,11 +349,12 @@ describe('Test of retrieveResponse function', function() {
 		expect(rrSpy.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
 	});
 })
+
 describe('Test of checkStatusCode function', function() {
 	
 	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
 	var satisfiedStResponse ={ statusCode: 300 };
-	var satisfiedStResponseBody = 'response body'
+	var satisfiedStResponseBody = 'response body';
 
 	beforeEach(() =>{
 		chkStatusSpy = sinon.spy(RegistrationHelpers, "checkStatusCode");
@@ -380,7 +363,6 @@ describe('Test of checkStatusCode function', function() {
 	afterEach(() =>{
 		chkStatusSpy.restore();
 	});
-	
 	
 	it(' checks if status code (from POST response in retrieveResponse) is equal to 200, if it is not, it throws an error.', async function (){
 
@@ -410,8 +392,11 @@ describe('Test of checkStatusCode function', function() {
 describe('Test of isSatisfied function', function() {
 
 	var isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
-          assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub;
-	//var child=  sinon.spy(Registration, "");//stand in child object 
+          assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub, auToSetSatisfied, satisfiedStTemplate, statement;
+	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }, 
+		txn ={ rollback: ()=> {return true|false}  }, 
+		satisfiedStResponse = "a satisfied response", satisfiedStResponseBody ="satisfied response body"; //passed as arguments
+	
 	var child = {
           lmsId: 0,
           id: 0,
@@ -421,16 +406,12 @@ describe('Test of isSatisfied function', function() {
           satisfied: true|false,
           children: [1, 2, 3, 4, 5],
           } 
-     //////
      var node = {
           satisfied : true | false,
           type: "",
           lmsId: true|false,
           children: [child, child, child]
           } 
-		
-          var auToSetSatisfied, satisfiedStTemplate, lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }, statement, txn ={ rollback: ()=> {return true|false}  }, 
-			satisfiedStResponse = "a satisfied response", satisfiedStResponseBody ="satisfied response body" //passed as arguments
 	
 	beforeEach(() =>{
 	     nodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'nodeSatisfied');
