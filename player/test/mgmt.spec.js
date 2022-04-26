@@ -51,6 +51,7 @@ describe("Database functions of mgmt.js", function() {
     code: code,
     id: "1234",
   };
+
   let tenantDb = {
     first: function() {
       return {
@@ -74,6 +75,7 @@ describe("Database functions of mgmt.js", function() {
       };
     },
   };
+
   let app = {
     db: function() {
       return tenantDb;
@@ -84,6 +86,7 @@ describe("Database functions of mgmt.js", function() {
       tokenSecret: "BigSecret",
     },
   };
+
   let tenantId = "tenantId";
   let req = {
     params: {
@@ -123,14 +126,17 @@ describe("Database functions of mgmt.js", function() {
     expect(test).to.eql(tenant);
   });
 
-  it("tryCreateTenant throws if insert fails", async function() {
-    let tryCreateTenantStub = sinon.stub(mgmt, "tryCreateTenant");
-    tryCreateTenantStub
-      .withArgs(app, code)
-      .rejects(Boom.internal(`Failed to insert tenant: Error`));
+  it("tryCreateTenant throws when bad data is given", async function() {
+    let badApp = {
+      db: function() {
+        throw new Error();
+      },
+    };
+
+    let tryCreateTenantSpy = sinon.spy(mgmt, "tryCreateTenant");
 
     try {
-      await mgmt.tryCreateTenant(app, code);
+      await mgmt.tryCreateTenant(badApp, code);
       assert.fail(error);
     } catch (ex) {
       function error() {
@@ -140,7 +146,7 @@ describe("Database functions of mgmt.js", function() {
       expect(error).to.throw(`Failed to insert`);
     }
 
-    expect(tryCreateTenantStub.calledOnceWithExactly(app, code)).to.be.true;
+    expect(tryCreateTenantSpy).to.be.calledOnce;
   });
 
   it("handleTenantDelete returns tenant with valid input", async function() {
@@ -164,14 +170,17 @@ describe("Database functions of mgmt.js", function() {
     expect(test).to.eql(null);
   });
 
-  it("tryDeleteTenant throws if input is invalid", async function() {
-    let tryDeleteTenantStub = sinon.stub(mgmt, "tryDeleteTenant");
-    tryDeleteTenantStub
-      .withArgs(app, tenantId)
-      .rejects(Boom.internal(`Failed to delete tenant (${tenantId}): Error`));
+  it("tryDeleteTenant throws when bad data is given", async function() {
+    let badApp = {
+      db: function() {
+        throw new Error();
+      },
+    };
+
+    let tryDeleteTenantSpy = sinon.stub(mgmt, "tryDeleteTenant");
 
     try {
-      await mgmt.tryDeleteTenant(app, tenantId);
+      await mgmt.tryDeleteTenant(badApp, tenantId);
       assert.fail(error);
     } catch (ex) {
       function error() {
@@ -181,7 +190,7 @@ describe("Database functions of mgmt.js", function() {
       expect(error).to.throw(`Failed to delete`);
     }
 
-    expect(tryDeleteTenantStub.calledOnceWithExactly(app, tenantId)).to.be.true;
+    expect(tryDeleteTenantSpy).to.be.calledOnce;
   });
 
   it("handleAuthToken returns a token with valid input", async function() {

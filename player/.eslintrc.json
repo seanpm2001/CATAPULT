@@ -1,0 +1,29 @@
+{
+  "extends": "strongloop",
+  "env": {
+    "es6": true,
+    "mocha": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2018
+  },
+  "rules": {
+    "max-len": [
+      "error",
+      {
+        "code": 90,
+        "ignoreComments": true,
+        "ignoreStrings": true,
+        "ignoreTemplateLiterals": true
+      }
+    ],
+    "new-cap": [
+      "error",
+      {
+        "newIsCapExceptions": ["async", "internal"]
+      }
+    ],
+    "no-unused-vars": "off",
+    "quotes": "double"
+  }
+}

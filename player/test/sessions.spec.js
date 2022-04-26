@@ -5,7 +5,6 @@ var expect = require("chai").expect;
 var sinon = require("sinon");
 
 var sessions = require("../service/plugins/routes/v1/sessions");
-var Session = require("../service/plugins/routes/lib/session");
 var Wreck = require("@hapi/wreck");
 
 describe("handleSessionTest", function() {
@@ -45,6 +44,7 @@ describe("handleSessionTest", function() {
         },
       },
     },
+    test: true,
   };
   h = null;
   let args = {
@@ -77,6 +77,26 @@ describe("handleSessionTest", function() {
     });
 
     expect(test).to.be.eql(null);
+  });
+
+  it("handleSession returns a loaded session when requested with valid input", async function() {
+    var sessionSpy = sinon.spy(sessions, "handleSession");
+
+    var test = await sessions.handleSession(req, h);
+
+    expect(sessionSpy.calledOnceWithExactly(req, h)).to.be.true;
+    expect(sessionSpy).to.not.throw();
+    expect(test).to.eql(result);
+  });
+
+  it("handleSession abandons the current session when requested with valid input", async function() {
+    var sessionSpy = sinon.spy(sessions, "handleSession");
+
+    var test = await sessions.handleSession(req, h, args);
+
+    expect(sessionSpy.calledOnceWithExactly(req, h, args)).to.be.true;
+    expect(sessionSpy).to.not.throw();
+    expect(test).to.eql(null);
   });
 
   it("handleSession returns a loaded session when requested with valid input", async function() {

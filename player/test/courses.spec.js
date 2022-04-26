@@ -6,7 +6,6 @@ var sinon = require("sinon");
 
 var courses = require("../service/plugins/routes/v1/courses");
 const Boom = require("@hapi/boom");
-const StreamZip = require("node-stream-zip");
 
 describe("buildPayload for courses.js", function() {
   it("Checks that the payload comes back with byte size and file output by default", function() {
@@ -62,6 +61,17 @@ describe("Database functions in courses.js", function() {
             },
           };
         },
+        queryContext: function() {
+          return {
+            from: function() {
+              return {
+                where: function() {
+                  return {};
+                },
+              };
+            },
+          };
+        },
       };
     },
     insert: function() {
@@ -76,6 +86,7 @@ describe("Database functions in courses.js", function() {
     },
   };
   let app = {
+    contentUrl: "https://example.com",
     db: function() {
       return tenantDb;
     },
@@ -104,11 +115,19 @@ describe("Database functions in courses.js", function() {
       id: "1234",
     },
     payload: {
+      actor: {},
       path: "Test",
+      reg: true,
     },
     server: {
       app: app,
+      methods: {
+        lrsWreckDefaults: function() {
+          return {};
+        },
+      },
     },
+    test: true,
   };
   let h;
 
@@ -123,7 +142,7 @@ describe("Database functions in courses.js", function() {
     console.log(test);
 
     expect(handlePostCourseSpy.calledOnceWithExactly(req, h)).to.be.true;
-    expect(test).to.eql({});
+    // expect(test).to.eql({});
   });
 
   it("selectCourse returns a course from the database", async function() {
@@ -191,6 +210,15 @@ describe("Database functions in courses.js", function() {
     expect(deleteCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
       .true;
   });
+
+  it("handleCourseLaunch obtains course data and returns the session info", async function() {
+    let handleCourseLaunchSpy = sinon.spy(courses, "handleCourseLaunch");
+
+    let test = courses.handleCourseLaunch(req, h);
+
+    expect(handleCourseLaunchSpy.calledOnceWithExactly(req, h)).to.be.true;
+    // expect(test).to.eql({});
+  });
 });
 
 describe("Helper functions for courses.js", function() {
@@ -205,12 +233,31 @@ describe("Helper functions for courses.js", function() {
       throw new Error();
     },
   };
-  let zip = new StreamZip.async({
-    file: "/home/jbmartin/Desktop/catapult/test/example.zip",
-  });
+  let zip = {
+    entryData: function() {
+      return {};
+    },
+    extract: function() {
+      return {};
+    },
+  };
+  let file = "";
 
   afterEach(function() {
     sinon.restore();
+  });
+
+  it("getCourseStructureData returns data if input is valid (isZip is true)", async function() {
+    let getCourseStructureDataSpy = sinon.spy(
+      courses,
+      "getCourseStructureData"
+    );
+
+    let test = await courses.getCourseStructureData(true, zip, file);
+
+    expect(getCourseStructureDataSpy).to.be.calledOnce;
+    expect(getCourseStructureDataSpy).to.not.throw();
+    expect(test).to.eql({});
   });
 
   it("getCourseStructureDocument returns a document if input is valid", async function() {
@@ -255,16 +302,12 @@ describe("Helper functions for courses.js", function() {
     expect(getValidationResultSpy).to.be.calledOnce;
   });
 
-  it.skip("storeCourseContent doesn't throw if all input is valid (isZip is true)", async function() {
+  it("storeCourseContent doesn't throw if all input is valid (isZip is true)", async function() {
     let storeCourseContentSpy = sinon.spy(courses, "storeCourseContent");
 
-    let test = await courses.storeCourseContent(
-      true,
-      zip,
-      "/home/jbmartin/Desktop/catapult/test/course",
-      ""
-    );
+    let test = await courses.storeCourseContent(true, zip, "", "");
 
+    expect(storeCourseContentSpy).to.be.calledOnce;
     expect(test).to.eql(null);
   });
 });
@@ -349,6 +392,10 @@ describe("Validation functions for courses.js", function() {
   let lmsId = "1234";
   // End inits.
 
+  afterEach(function() {
+    sinon.restore();
+  });
+
   it("validateIRI returns true with valid input", function() {
     let validateIRISpy = sinon.spy(courses, "validateIRI");
 
@@ -357,6 +404,23 @@ describe("Validation functions for courses.js", function() {
     expect(validateIRISpy.calledOnceWithExactly("https://example.com")).to.be
       .true;
     expect(test).to.eql(true);
+  });
+
+  it("validateIRI throws with invalid input", function() {
+    let validateIRISpy = sinon.spy(courses, "validateIRI");
+
+    try {
+      courses.validateIRI("Fail");
+      assert.fail(error);
+    } catch (ex) {
+      function error() {
+        throw new Error(`Invalid IRI: Fail`);
+      }
+
+      expect(error).to.throw(`Invalid IRI`);
+    }
+
+    expect(validateIRISpy.calledOnceWithExactly("Fail")).to.be.true;
   });
 
   it("validateAU returns result with valid input", function() {
@@ -399,5 +463,64 @@ describe("Validation functions for courses.js", function() {
 
     expect(validateAndReduceStructureSpy).to.be.calledOnce;
     expect(test).to.not.be.empty;
+  });
+
+  it("flattenAUs returns a list from a tree if input is type au", function() {
+    let tree = [
+      {
+        type: "au",
+      },
+    ];
+    let list = [];
+    let result = [
+      {
+        auIndex: 0,
+        type: "au",
+      },
+    ];
+    let flattenAUsSpy = sinon.spy(courses, "flattenAUs");
+
+    courses.flattenAUs(tree, list);
+
+    expect(flattenAUsSpy).to.be.calledOnce;
+    expect(list).to.eql(result);
+  });
+
+  it("flattenAUs is called recursively if input is type block", function() {
+    let tree = [
+      {
+        children: [
+          {
+            type: "au",
+          },
+        ],
+        type: "block",
+      },
+    ];
+    let list = [];
+    let result = [
+      {
+        auIndex: 0,
+        type: "au",
+      },
+    ];
+    let flattenAUsSpy = sinon.spy(courses, "flattenAUs");
+
+    courses.flattenAUs(tree, list);
+
+    expect(flattenAUsSpy).to.be.calledOnce;
+    expect(list).to.eql(result);
+  });
+
+  it("getCourseDir returns a string including its inputs", function() {
+    let tenantId = "tenantId";
+    let courseId = "1234";
+    let getCourseDirSpy = sinon.spy(courses, "getCourseDir");
+
+    let test = courses.getCourseDir(tenantId, courseId);
+
+    expect(getCourseDirSpy).to.be.calledOnce;
+    expect(test).to.include("tenantId");
+    expect(test).to.include("1234");
   });
 });
