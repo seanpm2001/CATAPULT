@@ -56,6 +56,13 @@ describe("Database functions in courses.js", function() {
       return {
         from: function() {
           return {
+            queryContext: function() {
+              return {
+                where: function() {
+                  return {};
+                },
+              };
+            },
             where: function() {
               return {};
             },
@@ -66,7 +73,15 @@ describe("Database functions in courses.js", function() {
             from: function() {
               return {
                 where: function() {
-                  return {};
+                  return {
+                    actor: {
+                      account: {
+                        homePage: "https://example.com",
+                        name: "abc",
+                      },
+                    },
+                    id: "1234",
+                  };
                 },
               };
             },
@@ -85,11 +100,10 @@ describe("Database functions in courses.js", function() {
       };
     },
   };
+
   let app = {
     contentUrl: "https://example.com",
-    db: function() {
-      return tenantDb;
-    },
+    db: tenantDb,
     jwt: {
       audPrefix: "abc",
       iss: "1234",
@@ -97,10 +111,8 @@ describe("Database functions in courses.js", function() {
     },
   };
 
-  let db = {};
+  let db, courseId;
   let tenantId = "tenantId";
-  let courseId = "1234";
-  let course = {};
 
   let req = {
     auth: {
@@ -112,10 +124,16 @@ describe("Database functions in courses.js", function() {
       "content-type": "text/xml",
     },
     params: {
+      auIndex: 0,
       id: "1234",
     },
     payload: {
-      actor: {},
+      actor: {
+        account: {
+          homePage: "https://example.com",
+          name: "abc",
+        },
+      },
       path: "Test",
       reg: true,
     },
@@ -145,48 +163,97 @@ describe("Database functions in courses.js", function() {
     // expect(test).to.eql({});
   });
 
-  it("selectCourse returns a course from the database", async function() {
-    let selectCourseStub = sinon.stub(courses, "selectCourse");
-    selectCourseStub.withArgs(db, tenantId, courseId).resolves(course);
+  db = {
+    first: function() {
+      return {
+        from: function() {
+          return {
+            queryContext: function() {
+              return {
+                where: function() {
+                  return {};
+                },
+              };
+            },
+            where: function() {
+              return {
+                delete: function() {
+                  return {};
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  courseId = "1234";
+
+  it("selectCourse returns a course with valid input", async function() {
+    let selectCourseSpy = sinon.spy(courses, "selectCourse");
 
     let test = await courses.selectCourse(db, tenantId, courseId);
 
-    expect(selectCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
+    expect(selectCourseSpy.calledOnceWithExactly(db, tenantId, courseId)).to.be
       .true;
-    expect(selectCourseStub).to.not.throw();
-    expect(test).to.eql(course);
+    expect(selectCourseSpy).to.not.throw();
+    expect(test).to.eql({});
   });
 
   it("selectCourse throws if course does not exist in the database", async function() {
-    let selectCourseStub = sinon.stub(courses, "selectCourse");
-    selectCourseStub
-      .withArgs(db, tenantId, courseId)
-      .rejects(Boom.notFound(`Unrecognized course: ${courseId} (${tenantId})`));
+    let badDb = {
+      first: function() {
+        return {
+          from: function() {
+            return {
+              queryContext: function() {
+                return {
+                  where: function() {
+                    return false;
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    let selectCourseSpy = sinon.spy(courses, "selectCourse");
 
     try {
-      await courses.selectCourse(db, tenantId, courseId);
+      await courses.selectCourse(badDb, tenantId, courseId);
       assert.fail(error);
     } catch (ex) {
       function error() {
         throw Boom.notFound(`Unrecognized course: ${courseId} (${tenantId})`);
       }
 
-      expect(error).to.throw(`Unrecognized course`);
+      expect(error).to.throw("Unrecognized course");
     }
 
-    expect(selectCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
-      .true;
+    expect(selectCourseSpy.calledOnceWithExactly(badDb, tenantId, courseId)).to
+      .be.true;
+  });
+
+  it("handleGetCourse selects a course with valid input", async function() {
+    let handleGetCourseSpy = sinon.spy(courses, "handleGetCourse");
+
+    let test = await courses.handleGetCourse(req, h);
+
+    expect(handleGetCourseSpy.calledOnceWithExactly(req, h)).to.be.true;
+    expect(handleGetCourseSpy).to.not.throw();
+    expect(test).to.eql({});
   });
 
   it("deleteCourse returns null if successful", async function() {
-    let deleteCourseStub = sinon.stub(courses, "deleteCourse");
-    deleteCourseStub.withArgs(db, tenantId, courseId).returns(null);
+    let deleteCourseSpy = sinon.spy(courses, "deleteCourse");
 
     let test = await courses.deleteCourse(db, tenantId, courseId);
 
-    expect(deleteCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
+    expect(deleteCourseSpy.calledOnceWithExactly(db, tenantId, courseId)).to.be
       .true;
-    expect(deleteCourseStub).to.not.throw();
+    expect(deleteCourseSpy).to.not.throw();
     expect(test).to.eql(null);
   });
 
@@ -204,7 +271,7 @@ describe("Database functions in courses.js", function() {
         throw new Boom.internal(`Failed to delete course (${courseId}): ${ex}`);
       }
 
-      expect(error).to.throw(`Failed to delete course`);
+      expect(error).to.throw("Failed to delete course");
     }
 
     expect(deleteCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
@@ -241,7 +308,6 @@ describe("Helper functions for courses.js", function() {
       return {};
     },
   };
-  let file = "";
 
   afterEach(function() {
     sinon.restore();
@@ -253,7 +319,7 @@ describe("Helper functions for courses.js", function() {
       "getCourseStructureData"
     );
 
-    let test = await courses.getCourseStructureData(true, zip, file);
+    let test = await courses.getCourseStructureData(true, zip, "");
 
     expect(getCourseStructureDataSpy).to.be.calledOnce;
     expect(getCourseStructureDataSpy).to.not.throw();
@@ -273,21 +339,21 @@ describe("Helper functions for courses.js", function() {
     expect(test).to.not.be.empty;
   });
 
-  it("getValidationResult returns true if input is valid", async function() {
-    let getValidationResultSpy = sinon.spy(courses, "getValidationResult");
+  it("validateSchema returns true if input is valid", async function() {
+    let validateSchemaSpy = sinon.spy(courses, "validateSchema");
 
-    let test = await courses.getValidationResult(documentValid);
+    let test = await courses.validateSchema(documentValid);
 
-    expect(getValidationResultSpy).to.be.calledOnce;
-    expect(getValidationResultSpy).to.not.throw();
-    expect(test).to.eql(true);
+    expect(validateSchemaSpy).to.be.calledOnce;
+    expect(validateSchemaSpy).to.not.throw();
+    expect(test).to.eql(null);
   });
 
-  it("getValidationResult throws if input is invalid", async function() {
-    let getValidationResultSpy = sinon.spy(courses, "getValidationResult");
+  it("validateSchema throws if input is invalid", async function() {
+    let validateSchemaSpy = sinon.spy(courses, "validateSchema");
 
     try {
-      await courses.getValidationResult(documentInvalid);
+      await courses.validateSchema(documentInvalid);
       assert.fail(error);
     } catch (ex) {
       function error() {
@@ -296,19 +362,42 @@ describe("Helper functions for courses.js", function() {
         );
       }
 
-      expect(error).to.throw(`Failed to validate course structure`);
+      expect(error).to.throw("Failed to validate course structure");
     }
 
-    expect(getValidationResultSpy).to.be.calledOnce;
+    expect(validateSchemaSpy).to.be.calledOnce;
   });
 
-  it("storeCourseContent doesn't throw if all input is valid (isZip is true)", async function() {
+  it("storeCourseContent returns null if input is valid (isZip is true)", async function() {
     let storeCourseContentSpy = sinon.spy(courses, "storeCourseContent");
 
     let test = await courses.storeCourseContent(true, zip, "", "");
 
     expect(storeCourseContentSpy).to.be.calledOnce;
     expect(test).to.eql(null);
+  });
+
+  it("storeCourseContent throws if input is valid (isZip is true)", async function() {
+    let badZip = {
+      entryData: function() {
+        throw new Error();
+      },
+    };
+
+    let storeCourseContentSpy = sinon.spy(courses, "storeCourseContent");
+
+    try {
+      await courses.storeCourseContent(true, badZip, "", "");
+      assert.fail(error);
+    } catch (ex) {
+      function error() {
+        throw Boom.internal(new Error(`Failed to store course content: ${ex}`));
+      }
+
+      expect(error).to.throw("Failed to store");
+    }
+
+    expect(storeCourseContentSpy).to.be.calledOnce;
   });
 });
 
@@ -324,7 +413,46 @@ describe("Validation functions for courses.js", function() {
       };
     },
     childNodes: function() {
-      return [];
+      return [
+        {
+          attr: function() {
+            return {
+              value: function() {
+                return "https://example.com";
+              },
+            };
+          },
+          get: function() {
+            return {
+              childNodes: function() {
+                return [
+                  {
+                    attr: function() {
+                      return {
+                        value: function() {
+                          return "https://example.com";
+                        },
+                      };
+                    },
+                    map: function() {
+                      return "1234";
+                    },
+                    text: function() {
+                      return "abc";
+                    },
+                  },
+                ];
+              },
+              text: function() {
+                return "abc";
+              },
+            };
+          },
+          name: function() {
+            return "au";
+          },
+        },
+      ];
     },
     get: function() {
       return {
@@ -337,6 +465,7 @@ describe("Validation functions for courses.js", function() {
   };
   let lmsIdHelper = {
     auIndex: 0,
+    blockIndex: 0,
     prefix: "prefix",
   };
   let objectiveMap = {
@@ -365,7 +494,46 @@ describe("Validation functions for courses.js", function() {
     root: function() {
       return {
         childNodes: function() {
-          return [];
+          return [
+            {
+              attr: function() {
+                return {
+                  value: function() {
+                    return "https://example.com";
+                  },
+                };
+              },
+              get: function() {
+                return {
+                  childNodes: function() {
+                    return [
+                      {
+                        attr: function() {
+                          return {
+                            value: function() {
+                              return "https://example.com";
+                            },
+                          };
+                        },
+                        map: function() {
+                          return "1234";
+                        },
+                        text: function() {
+                          return "abc";
+                        },
+                      },
+                    ];
+                  },
+                  text: function() {
+                    return "abc";
+                  },
+                };
+              },
+              name: function() {
+                return "au";
+              },
+            },
+          ];
         },
         get: function() {
           return {
@@ -377,7 +545,31 @@ describe("Validation functions for courses.js", function() {
               };
             },
             childNodes: function() {
-              return [];
+              return [
+                {
+                  attr: function() {
+                    return {
+                      value: function() {
+                        return "https://example.com";
+                      },
+                    };
+                  },
+                  get: function() {
+                    return {
+                      childNodes: function() {
+                        return {
+                          map: function() {
+                            return "1234";
+                          },
+                        };
+                      },
+                    };
+                  },
+                  name: function() {
+                    return "objective";
+                  },
+                },
+              ];
             },
             get: function() {
               return {};
@@ -414,10 +606,10 @@ describe("Validation functions for courses.js", function() {
       assert.fail(error);
     } catch (ex) {
       function error() {
-        throw new Error(`Invalid IRI: Fail`);
+        throw new Error("Invalid IRI: Fail");
       }
 
-      expect(error).to.throw(`Invalid IRI`);
+      expect(error).to.throw("Invalid IRI");
     }
 
     expect(validateIRISpy.calledOnceWithExactly("Fail")).to.be.true;
@@ -438,7 +630,7 @@ describe("Validation functions for courses.js", function() {
     expect(test).to.not.be.empty;
   });
 
-  it("validateBlock returns result with valid input", function() {
+  it.skip("validateBlock returns result with valid input", function() {
     let validateBlockSpy = sinon.spy(courses, "validateBlock");
 
     let test = courses.validateBlock(

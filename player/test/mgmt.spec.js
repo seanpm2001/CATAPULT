@@ -143,7 +143,7 @@ describe("Database functions of mgmt.js", function() {
         throw Boom.internal(`Failed to insert tenant: ${ex}`);
       }
 
-      expect(error).to.throw(`Failed to insert`);
+      expect(error).to.throw("Failed to insert");
     }
 
     expect(tryCreateTenantSpy).to.be.calledOnce;
@@ -187,7 +187,7 @@ describe("Database functions of mgmt.js", function() {
         throw Boom.internal(`Failed to delete tenant (${tenantId}): ${ex}`);
       }
 
-      expect(error).to.throw(`Failed to delete`);
+      expect(error).to.throw("Failed to delete");
     }
 
     expect(tryDeleteTenantSpy).to.be.calledOnce;

@@ -24,6 +24,6 @@
       }
     ],
     "no-unused-vars": "off",
-    "quotes": "double"
+    "quotes": [2, "double", { "avoidEscape": true }]
   }
 }

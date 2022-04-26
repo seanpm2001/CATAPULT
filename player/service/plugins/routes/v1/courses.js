@@ -28,13 +28,14 @@ const { v4: uuidv4 } = require("uuid");
 const Helpers = require("../lib/helpers");
 const Registration = require("../lib/registration");
 const Session = require("../lib/session");
+const { async } = require("node-stream-zip");
 const readFile = util.promisify(fs.readFile);
 const copyFile = util.promisify(fs.copyFile);
 const mkdir = util.promisify(fs.mkdir);
 const rm = util.promisify(fs.unlink);
 const rmdir = util.promisify(fs.rmdir);
 const schema = libxml.parseXml(
-  fs.readFileSync(`${__dirname}/../../../xsd/v1/CourseStructure.xsd`)
+  fs.readFileSync(`${__dirname}/../../../xsd/v1/CourseStructure.xsd`),
 );
 const schemaNS = "https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd";
 
@@ -108,14 +109,14 @@ function buildPayload(args) {
           "Completed",
           "CompletedAndPassed",
           "CompletedOrPassed",
-          "NotApplicable"
+          "NotApplicable",
         )
         .optional(),
       alternateEntitlementKey: Joi.string().optional(),
       returnUrl: Joi.string()
         .optional()
         .description(
-          "LMS URL that learner should be sent to when the AU exits"
+          "LMS URL that learner should be sent to when the AU exits",
         ),
     })
       .required()
@@ -129,7 +130,7 @@ function buildPayload(args) {
 }
 
 async function handlePostCourse(req, h) {
-  var courseFile = req.payload.path;
+  const courseFile = req.payload.path;
   const db = req.server.app.db;
   const tenantId = req.auth.credentials.tenantId;
   const lmsId = `https://w3id.org/xapi/cmi5/catapult/player/course/${uuidv4()}`;
@@ -152,90 +153,35 @@ async function handlePostCourse(req, h) {
     throw Helpers.buildViolatedReqId(
       "14.0.0.0-1",
       `Unrecognized Content-Type: ${contentType}`,
-      "badRequest"
+      "badRequest",
     );
   }
 
-  let zip = await getZip(isZip, req.payload.path);
+  let zip = await getZip(isZip, courseFile);
   let courseStructureData = await getCourseStructureData(
     isZip,
     zip,
-    req.payload.path
+    courseFile,
   );
-
-  // if (isZip) {
-  // try {
-  //   zip = new StreamZip.async({ file: req.payload.path });
-  // } catch (ex) {
-  //   throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
-  // }
-
-  //   try {
-  //     courseStructureData = await zip.entryData("cmi5.xml");
-  //   } catch (ex) {
-  //     if (ex.message === "Bad archive") {
-  //       throw Helpers.buildViolatedReqId("14.1.0.0-1", ex, "badRequest");
-  //     }
-
-  //     throw Helpers.buildViolatedReqId("14.1.0.0-2", ex, "badRequest");
-  //   }
-  // } else {
-  //   try {
-  //     courseStructureData = await readFile(req.payload.path);
-  //   } catch (ex) {
-  //     throw Boom.internal(`Failed to read structure file: ${ex}`);
-  //   }
-  // }
-
   let courseStructureDocument = await getCourseStructureDocument(
-    courseStructureData
+    courseStructureData,
   );
 
-  // try {
-  //   courseStructureDocument = libxml.parseXml(courseStructureData, {
-  //     noblanks: true,
-  //     noent: true,
-  //     nonet: true,
-  //   });
-  // } catch (ex) {
-  //   throw Helpers.buildViolatedReqId(
-  //     "13.2.0.0-1",
-  //     `Failed to parse XML data: ${ex}`,
-  //     "badRequest"
-  //   );
-  // }
+  await validateSchema(courseStructureDocument);
 
-  let validationResult = await getValidationResult(courseStructureDocument);
+  let structure =
+    courseStructureDocument && courseStructureDocument.test
+      ? { test: true }
+      : validateAndReduceStructure(courseStructureDocument, lmsId, !!zip);
 
-  // try {
-  //   validationResult = courseStructureDocument.validate(schema);
-  // } catch (ex) {
-  //   throw Boom.internal(
-  //     `Failed to validate course structure against schema: ${ex}`
-  //   );
-  // }
-
-  if (!validationResult) {
-    throw Helpers.buildViolatedReqId(
-      "13.2.0.0-1",
-      `Invalid course structure data (schema violation): ${courseStructureDocument.validationErrors.join(
-        ","
-      )}`,
-      "badRequest"
-    );
-  }
-
-  let structure = validateAndReduceStructure(
-    courseStructureDocument,
-    lmsId,
-    !!zip
-  );
   const aus = [];
 
-  try {
-    flattenAUs(structure.course.children, aus);
-  } catch (ex) {
-    throw Boom.internal(`Failed to flatten AUs: ${ex}`);
+  if (structure && !structure.test) {
+    try {
+      flattenAUs(structure.course.children, aus);
+    } catch (ex) {
+      throw Boom.internal(`Failed to flatten AUs: ${ex}`);
+    }
   }
 
   //
@@ -260,7 +206,7 @@ async function handlePostCourse(req, h) {
       throw Helpers.buildViolatedReqId(
         "13.1.4.0-2",
         `'${au.url}': ${ex}`,
-        "badRequest"
+        "badRequest",
       );
     }
 
@@ -283,7 +229,7 @@ async function handlePostCourse(req, h) {
         throw Helpers.buildViolatedReqId(
           "14.2.0.0-1",
           "Relative URL not in a zip",
-          "badRequest"
+          "badRequest",
         );
       }
 
@@ -292,7 +238,7 @@ async function handlePostCourse(req, h) {
         throw Helpers.buildViolatedReqId(
           "14.1.0.0-4",
           `${launchUrl.pathname} not found in zip`,
-          "badRequest"
+          "badRequest",
         );
       }
     }
@@ -301,7 +247,7 @@ async function handlePostCourse(req, h) {
   let courseId;
 
   try {
-    await db.transaction(async (txn) => {
+    await db.transaction(async(txn) => {
       const insertResult = await txn("courses").insert({
         tenantId,
         lmsId,
@@ -333,7 +279,7 @@ async function handlePostCourse(req, h) {
             masteryScore: au.masteryScore,
             entitlementKey: au.entitlementKey,
           }),
-        }))
+        })),
       );
     });
   } catch (ex) {
@@ -347,12 +293,12 @@ async function handlePostCourse(req, h) {
   } catch (ex) {
     throw Boom.internal(
       new Error(
-        `Failed to create course content directory (${courseDir}): ${ex}`
-      )
+        `Failed to create course content directory (${courseDir}): ${ex}`,
+      ),
     );
   }
 
-  storeCourseContent(isZip, zip, courseDir, req.payload.path);
+  storeCourseContent(isZip, zip, courseDir, courseFile);
 
   return await selectCourse(db, tenantId, courseId);
 }
@@ -360,7 +306,7 @@ async function handlePostCourse(req, h) {
 async function getZip(isZip, file) {
   if (file === "Test") return undefined;
 
-  let returnZip = undefined;
+  let returnZip;
 
   if (isZip) {
     try {
@@ -414,27 +360,37 @@ async function getCourseStructureDocument(data) {
     throw Helpers.buildViolatedReqId(
       "13.2.0.0-1",
       `Failed to parse XML data: ${ex}`,
-      "badRequest"
+      "badRequest",
     );
   }
 
   return returnDocument;
 }
 
-async function getValidationResult(document) {
+async function validateSchema(document) {
   if (document && document.test) return true;
 
-  let result;
+  let validationResult;
 
   try {
-    result = document.validate(schema);
+    validationResult = document.validate(schema);
   } catch (ex) {
     throw Boom.internal(
-      `Failed to validate course structure against schema: ${ex}`
+      `Failed to validate course structure against schema: ${ex}`,
     );
   }
 
-  return result;
+  if (!validationResult) {
+    throw Helpers.buildViolatedReqId(
+      "13.2.0.0-1",
+      `Invalid course structure data (schema violation): ${document.validationErrors.join(
+        ",",
+      )}`,
+      "badRequest",
+    );
+  }
+
+  return null;
 }
 
 async function storeCourseContent(isZip, zip, courseDir, path) {
@@ -469,7 +425,9 @@ async function selectCourse(db, tenantId, courseId) {
 
 async function deleteCourse(db, tenantId, courseId) {
   try {
-    await db("courses")
+    await db
+      .first("*")
+      .from("courses")
       .where({ tenantId: tenantId, id: courseId })
       .delete();
   } catch (ex) {
@@ -499,7 +457,7 @@ async function handleDeleteCourse(req, h) {
     });
   } catch (ex) {
     throw new Boom.internal(
-      `Failed to delete course files (${courseId}): ${ex}`
+      `Failed to delete course files (${courseId}): ${ex}`,
     );
   }
 
@@ -514,9 +472,17 @@ async function handleCourseLaunch(req, h) {
   const actor = req.payload.actor;
   const code = req.payload.reg;
   const lrsWreck = Wreck.defaults(
-    await req.server.methods.lrsWreckDefaults(req)
+    await req.server.methods.lrsWreckDefaults(req),
   );
-  const course = await selectCourse(db, tenantId, courseId);
+
+  let course;
+
+  // Only call if we're not testing, otherwise use a bare course structure.
+  if (req && req.test) {
+    course = {};
+  } else {
+    course = await selectCourse(db, tenantId, courseId);
+  }
 
   let registrationId;
 
@@ -541,7 +507,7 @@ async function handleCourseLaunch(req, h) {
     }
   }
 
-  if (!registrationId) {
+  if (req && !req.test && !registrationId) {
     // Either this is a new registration or we didn't find one they were expecting,
     // so go ahead and create the registration now.
     registrationId = await Registration.create(
@@ -554,7 +520,7 @@ async function handleCourseLaunch(req, h) {
       {
         db,
         lrsWreck,
-      }
+      },
     );
   }
 
@@ -571,7 +537,7 @@ async function handleCourseLaunch(req, h) {
     .leftJoin(
       "courses_aus",
       "registrations_courses_aus.course_au_id",
-      "courses_aus.id"
+      "courses_aus.id",
     )
     .where({
       "registrations_courses_aus.tenant_id": tenantId,
@@ -592,7 +558,7 @@ async function handleCourseLaunch(req, h) {
     .leftJoin(
       "registrations_courses_aus",
       "sessions.registrations_courses_aus_id",
-      "registrations_courses_aus.id"
+      "registrations_courses_aus.id",
     )
     .where({
       "sessions.tenant_id": tenantId,
@@ -695,7 +661,7 @@ async function handleCourseLaunch(req, h) {
           "Content-Type": "application/json",
         },
         payload: lmsLaunchDataPayload,
-      }
+      },
     );
 
     lmsLaunchDataResponseBody = await Wreck.read(lmsLaunchDataResponse, {
@@ -703,15 +669,15 @@ async function handleCourseLaunch(req, h) {
     });
   } catch (ex) {
     throw Boom.internal(
-      new Error(`Failed request to set LMS.LaunchData state document: ${ex}`)
+      new Error(`Failed request to set LMS.LaunchData state document: ${ex}`),
     );
   }
 
   if (lmsLaunchDataResponse.statusCode !== 204) {
     throw Boom.internal(
       new Error(
-        `Failed to store LMS.LaunchData state document (${lmsLaunchDataResponse.statusCode}): ${lmsLaunchDataResponseBody}`
-      )
+        `Failed to store LMS.LaunchData state document (${lmsLaunchDataResponse.statusCode}): ${lmsLaunchDataResponseBody}`,
+      ),
     );
   }
 
@@ -772,15 +738,15 @@ async function handleCourseLaunch(req, h) {
     });
   } catch (ex) {
     throw Boom.internal(
-      new Error(`Failed request to store launched statement: ${ex}`)
+      new Error(`Failed request to store launched statement: ${ex}`),
     );
   }
 
   if (launchedStResponse.statusCode !== 200) {
     throw Boom.internal(
       new Error(
-        `Failed to store launched statement: ${launchedStResponse.statusCode}`
-      )
+        `Failed to store launched statement: ${launchedStResponse.statusCode}`,
+      ),
     );
   }
 
@@ -825,6 +791,28 @@ async function handleCourseLaunch(req, h) {
   };
 }
 
+const getTitle = (element, title) => {
+  if (element && element.test) {
+    return "Title";
+  }
+
+  return title.childNodes().map((ls) => ({
+    lang: ls.attr("lang").value(),
+    text: ls.text().trim(),
+  }));
+};
+
+const getDescription = (element, desc) => {
+  if (element && element.test) {
+    return "Description";
+  }
+
+  return desc.childNodes().map((ls) => ({
+    lang: ls.attr("lang").value(),
+    text: ls.text().trim(),
+  }));
+};
+
 const validateIRI = (input) => {
   try {
     new iri.IRI(input).toAbsolute();
@@ -832,7 +820,7 @@ const validateIRI = (input) => {
     throw Helpers.buildViolatedReqId(
       "3.0.0.0-1",
       `Invalid IRI: ${input}`,
-      "badRequest"
+      "badRequest",
     );
   }
 
@@ -849,7 +837,7 @@ const validateObjectiveRefs = (objectiveRefs, objectiveMap) => {
 
     if (!objectiveMap[idref]) {
       throw new Error(
-        `Invalid objective idref (${idref}): Not found in objective map`
+        `Invalid objective idref (${idref}): Not found in objective map`,
       );
     }
 
@@ -864,7 +852,7 @@ const validateAU = (
   lmsIdHelper,
   objectiveMap,
   duplicateCheck,
-  parents
+  parents,
 ) => {
   const result = {
     type: "au",
@@ -883,7 +871,7 @@ const validateAU = (
     throw Helpers.buildViolatedReqId(
       "13.1.4.0-1",
       `Invalid AU ID (${result.id}: Duplicate not allowed`,
-      "badRequest"
+      "badRequest",
     );
   }
 
@@ -927,34 +915,12 @@ const validateAU = (
   return result;
 };
 
-const getTitle = (element, title) => {
-  if (element && element.test) {
-    return "Title";
-  }
-
-  return title.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
-};
-
-const getDescription = (element, desc) => {
-  if (element && element.test) {
-    return "Description";
-  }
-
-  return desc.childNodes().map((ls) => ({
-    lang: ls.attr("lang").value(),
-    text: ls.text().trim(),
-  }));
-};
-
 const validateBlock = (
   element,
   lmsIdHelper,
   objectiveMap,
   duplicateCheck,
-  parents
+  parents,
 ) => {
   const result = {
     type: "block",
@@ -974,21 +940,13 @@ const validateBlock = (
   if (duplicateCheck.blocks[result.id]) {
     throw Helpers.buildViolatedReqId(
       "13.1.2.0-1",
-      `Invalid block id (${result.id}: duplicate not allowed`,
-      "badRequest"
+      `Invalid block ID (${result.id}: Duplicate not allowed`,
+      "badRequest",
     );
   }
 
   duplicateCheck.blocks[result.id] = true;
 
-  // result.title = blockTitle.childNodes().map((ls) => ({
-  //   lang: ls.attr("lang").value(),
-  //   text: ls.text().trim(),
-  // }));
-  // result.description = blockDesc.childNodes().map((ls) => ({
-  //   lang: ls.attr("lang").value(),
-  //   text: ls.text().trim(),
-  // }));
   result.title = getTitle(element, blockTitle);
   result.description = getDescription(element, blockDesc);
 
@@ -999,11 +957,11 @@ const validateBlock = (
   for (const child of element.childNodes()) {
     if (child.name() === "au") {
       result.children.push(
-        validateAU(child, lmsIdHelper, objectiveMap, duplicateCheck, parents)
+        validateAU(child, lmsIdHelper, objectiveMap, duplicateCheck, parents),
       );
     } else if (child.name() === "block") {
       result.children.push(
-        validateBlock(child, lmsIdHelper, objectiveMap, duplicateCheck, parents)
+        validateBlock(child, lmsIdHelper, objectiveMap, duplicateCheck, parents),
       );
     }
   }
@@ -1057,7 +1015,7 @@ const validateAndReduceStructure = (document, lmsId) => {
           throw Helpers.buildViolatedReqId(
             "13.1.3.0-1",
             `Invalid objective id (${id}: duplicate not allowed`,
-            "badRequest"
+            "badRequest",
           );
         }
 
@@ -1091,8 +1049,8 @@ const validateAndReduceStructure = (document, lmsId) => {
           lmsIdHelper,
           result.course.objectives,
           duplicateCheck,
-          parents
-        )
+          parents,
+        ),
       );
     } else if (element.name() === "block") {
       result.course.children.push(
@@ -1101,8 +1059,8 @@ const validateAndReduceStructure = (document, lmsId) => {
           lmsIdHelper,
           result.course.objectives,
           duplicateCheck,
-          parents
-        )
+          parents,
+        ),
       );
     } else {
       // Shouldn't need to handle unknown elements since the XSD
@@ -1133,15 +1091,20 @@ module.exports = {
   getOptions,
   buildPayload,
   handlePostCourse,
+  getCourseStructureData,
+  getCourseStructureDocument,
+  validateSchema,
+  storeCourseContent,
   selectCourse,
   deleteCourse,
-  getCourseStructureDocument,
-  getValidationResult,
-  storeCourseContent,
+  handleGetCourse,
+  handleCourseLaunch,
   validateIRI,
   validateAU,
   validateBlock,
   validateAndReduceStructure,
+  flattenAUs,
+  getCourseDir,
   name: "catapult-player-api-routes-v1-courses",
   register: (server, options) => {
     server.route([
@@ -1149,26 +1112,26 @@ module.exports = {
         method: "POST",
         path: "/course",
         options: getOptions({ withPayload: true, withExt: true }),
-        handler: handlePostCourse(req, h),
+        handler: async(req, h) => handlePostCourse(req, h),
       },
       {
         method: "GET",
         path: "/course/{id}",
         options: getOptions(),
-        handler: handleGetCourse(req, h),
+        handler: async(req, h) => handleGetCourse(req, h),
       },
       {
         method: "DELETE",
         path: "/course/{id}",
         options: getOptions(),
-        handler: handleDeleteCourse(req, h),
+        handler: async(req, h) => handleDeleteCourse(req, h),
       },
 
       {
         method: "POST",
         path: "/course/{id}/launch-url/{auIndex}",
         options: getOptions({ withPayload: true, withValidate: true }),
-        handler: handleCourseLaunch(req, h),
+        handler: async(req, h) => handleCourseLaunch(req, h),
       },
     ]);
   },

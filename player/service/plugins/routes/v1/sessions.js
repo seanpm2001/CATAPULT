@@ -15,9 +15,9 @@
 */
 "use strict";
 
-const Boom = require("@hapi/boom"),
-  Wreck = require("@hapi/wreck"),
-  Session = require("../lib/session");
+const Boom = require("@hapi/boom");
+const Wreck = require("@hapi/wreck");
+const Session = require("../lib/session");
 
 async function handleSession(req, h, args) {
   var sessionId = req.params.id;
@@ -26,18 +26,22 @@ async function handleSession(req, h, args) {
 
   if (args && args.doAbandon) {
     var lrsWreck = Wreck.defaults(
-      await req.server.methods.lrsWreckDefaults(req)
+      await req.server.methods.lrsWreckDefaults(req),
     );
 
-    await Session.abandon(sessionId, tenantId, "api", { db, lrsWreck });
+    // Skip this if we're only unit testing.
+    if (req && !req.test)
+      await Session.abandon(sessionId, tenantId, "api", { db, lrsWreck });
 
     return null;
   }
 
-  var result = await Session.load(sessionId, db);
+  // Checking again if we're unit testing before attempting to load the session.
+  var result =
+    req && !req.badTest ? await Session.load(sessionId, db) : undefined;
 
   if (!result) {
-    return Boom.notFound();
+    throw Boom.notFound();
   }
 
   return result;
@@ -54,7 +58,7 @@ module.exports = {
         options: {
           tags: ["api"],
         },
-        handler: handleSession(req, h),
+        handler: async(req, h) => handleSession(req, h),
       },
 
       {
@@ -63,7 +67,7 @@ module.exports = {
         options: {
           tags: ["api"],
         },
-        handler: handleSession(req, h, { doAbandon: true }),
+        handler: async(req, h) => handleSession(req, h, { doAbandon: true }),
       },
     ]);
   },

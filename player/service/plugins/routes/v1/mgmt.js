@@ -141,7 +141,7 @@ function generateToken(app, audience, tenantId) {
       sub: tenantId,
       jti: uuidv4(),
     },
-    app.jwt.tokenSecret
+    app.jwt.tokenSecret,
   );
 
   return { token };
@@ -186,13 +186,13 @@ module.exports = {
           withValidate: true,
           requestAuth: false,
         }),
-        handler: handleTenantCreate(req, h),
+        handler: async(req, h) => handleTenantCreate(req, h),
       },
       {
         method: "DELETE",
         path: "/tenant/{id}",
         options: getOptions({ withAuth: true }),
-        handler: handleTenantDelete(),
+        handler: async(req, h) => handleTenantDelete(req, h),
       },
       {
         method: "POST",
@@ -202,7 +202,7 @@ module.exports = {
           withValidate: true,
           requestAuth: true,
         }),
-        handler: handleAuthToken(req, h),
+        handler: async(req, h) => handleAuthToken(req, h),
       },
     ]);
   },

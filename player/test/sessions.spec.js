@@ -5,11 +5,9 @@ var expect = require("chai").expect;
 var sinon = require("sinon");
 
 var sessions = require("../service/plugins/routes/v1/sessions");
-var Wreck = require("@hapi/wreck");
 
 describe("handleSessionTest", function() {
-  let req, h;
-  req = {
+  let req = {
     auth: {
       credentials: {
         tenantId: "tenantId",
@@ -46,7 +44,8 @@ describe("handleSessionTest", function() {
     },
     test: true,
   };
-  h = null;
+  let h = null;
+
   let args = {
     doAbandon: true,
   };
@@ -99,13 +98,43 @@ describe("handleSessionTest", function() {
     expect(test).to.eql(null);
   });
 
-  it("handleSession returns a loaded session when requested with valid input", async function() {
+  it("handleSession throws when it fails to load a session", async function() {
+    let badReq = {
+      auth: {
+        credentials: {
+          tenantId: "tenantId",
+        },
+      },
+      badTest: true,
+      params: {
+        id: "1234",
+      },
+      server: {
+        app: {
+          db: {},
+        },
+        methods: {
+          lrsWreckDefaults: function() {
+            return {};
+          },
+        },
+      },
+      test: true,
+    };
+
     var sessionSpy = sinon.spy(sessions, "handleSession");
 
-    var test = await sessions.handleSession(req, h);
+    try {
+      await sessions.handleSession(badReq, h);
+      assert.fail(error);
+    } catch (ex) {
+      function error() {
+        throw Boom.notFound();
+      }
 
-    expect(sessionSpy.calledOnceWithExactly(req, h)).to.be.true;
-    expect(sessionSpy).to.not.throw();
-    expect(test).to.eql(result);
+      expect(error).to.throw();
+    }
+
+    expect(sessionSpy.calledOnceWithExactly(badReq, h)).to.be.true;
   });
 });
