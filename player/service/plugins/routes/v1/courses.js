@@ -17,48 +17,63 @@
 
 const fs = require("fs");
 const util = require("util");
+const hapi = require("@hapi/hapi");
 const Boom = require("@hapi/boom");
 const Wreck = require("@hapi/wreck");
 const Hoek = require("@hapi/hoek");
 const Joi = require("joi");
-const libxml = require("libxmljs");
+const libxml = require("libxmljs2");
 const StreamZip = require("node-stream-zip");
 const iri = require("iri");
 const { v4: uuidv4 } = require("uuid");
 const Helpers = require("../lib/helpers");
 const Registration = require("../lib/registration");
 const Session = require("../lib/session");
-const { async } = require("node-stream-zip");
 const readFile = util.promisify(fs.readFile);
 const copyFile = util.promisify(fs.copyFile);
 const mkdir = util.promisify(fs.mkdir);
 const rm = util.promisify(fs.unlink);
-const rmdir = util.promisify(fs.rmdir);
 const schema = libxml.parseXml(
   fs.readFileSync(`${__dirname}/../../../xsd/v1/CourseStructure.xsd`),
 );
 const schemaNS = "https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd";
 
-//
-// This is basically a check for a scheme, assume that if there is a scheme
-// that the URL is absolute, not checking for `://` because it could be a
-// non-IP based URL per RFC1738.
-//
+
+/**
+ * This is basically a check for a scheme, assume that if there is a scheme
+ * that the URL is absolute, not checking for `://` because it could be a
+ * non-IP based URL per RFC1738.
+ * @param {string} url 
+ * @returns Whether or not it's an absolute URL.
+ */
 const isAbsolute = (url) => /^[A-Za-z]+:.+/.test(url);
 
+/**
+ * @typedef CourseOptionsArgs
+ * @property {string} withPayload Indicates that the options should include a payload.
+ * @property {string} withValidate Indicates that the payload will be within a `validate` object.
+ * @property {string} withExt Adds extension middleware.
+ */
+/**
+ * Requests Course options according to a CourseOptionsArgs object.
+ * @param {CourseOptionsArgs} args 
+ * @returns 
+ */
 function getOptions(args) {
   var optionsOut = { tags: ["api"] };
-  var payloadOut;
 
-  if (args && args.withPayload) {
-    payloadOut = buildPayload(args);
-    if (args.withValidate) {
-      optionsOut.validate = {};
-      optionsOut.validate.payload = payloadOut;
-    } else optionsOut.payload = payloadOut;
+  if (!args)
+    return optionsOut;
+
+  if (args.withPayload) {
+    let payload = buildPayload(args);
+    if (args.withValidate)
+      optionsOut.validate = { payload };
+    else 
+      optionsOut.payload = payload;
   }
 
-  if (args && args.withExt)
+  if (args.withExt)
     optionsOut.ext = {
       onPostResponse: {
         method: (req) => {
@@ -77,6 +92,11 @@ function getOptions(args) {
   return optionsOut;
 }
 
+/**
+ * Builds a request payload according to a CourseOptionsArgs object.
+ * @param {CourseOptionsArgs} args 
+ * @returns 
+ */
 function buildPayload(args) {
   var payloadObj = {};
 
@@ -129,12 +149,20 @@ function buildPayload(args) {
   return payloadObj;
 }
 
+/**
+ * Middleware for handling a user creating a course w/ POST.
+ * @param {hapi.Request} req 
+ * @param {hapi.ResponseToolkit} h 
+ * @returns 
+ */
 async function handlePostCourse(req, h) {
+  const app = req.server.app;
   const courseFile = req.payload.path;
   const db = req.server.app.db;
   const tenantId = req.auth.credentials.tenantId;
-  const lmsId = `https://w3id.org/xapi/cmi5/catapult/player/course/${uuidv4()}`;
   const contentType = req.headers["content-type"];
+  
+  const lmsId = `https://w3id.org/xapi/cmi5/catapult/player/course/${uuidv4()}`;
 
   //
   // application/x-zip-compressed seems to be deprecated but at least Windows 10
@@ -201,7 +229,7 @@ async function handlePostCourse(req, h) {
       // a way such that we maintain the relative nature, so do that
       // after validating.
       //
-      launchUrl = new URL(au.url, req.server.app.contentUrl);
+      launchUrl = new URL(au.url, app.contentUrl);
     } catch (ex) {
       throw Helpers.buildViolatedReqId(
         "13.1.4.0-2",
@@ -437,6 +465,12 @@ async function deleteCourse(db, tenantId, courseId) {
   return null;
 }
 
+/**
+ * Middleware for handling a course GET.
+ * @param {hapi.Request} req 
+ * @param {hapi.ResponseToolkit} h 
+ * @returns 
+ */
 async function handleGetCourse(req, h) {
   let db = req.server.app.db;
   let tenantId = req.auth.credentials.tenantId;
@@ -445,6 +479,12 @@ async function handleGetCourse(req, h) {
   return await selectCourse(db, tenantId, courseId);
 }
 
+/**
+ * Middleware for handling a course DELETE.
+ * @param {hapi.Request} req 
+ * @param {hapi.ResponseToolkit} h 
+ * @returns 
+ */
 async function handleDeleteCourse(req, h) {
   let db = req.server.app.db;
   let tenantId = req.auth.credentials.tenantId;
@@ -464,6 +504,12 @@ async function handleDeleteCourse(req, h) {
   return await deleteCourse(db, tenantId, courseId);
 }
 
+/**
+ * Middleware for handling a course launch with POST request.
+ * @param {hapi.Request} req 
+ * @param {hapi.ResponseToolkit} h 
+ * @returns 
+ */
 async function handleCourseLaunch(req, h) {
   const db = req.server.app.db;
   const tenantId = req.auth.credentials.tenantId;
