@@ -10,272 +10,248 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
-"use strict";
-const lrs = require("../lrs");
-const RegistrationHelpers = require('./registrationHelpers.js');
-const { v4: uuidv4 } = require("uuid"),
-    Boom = require("@hapi/boom"),
-    Wreck = require("@hapi/wreck");
-    
 
-let Registration;
+const RegistrationHelpers = require('./registrationHelpers.js')
+const { v4: uuidv4 } = require('uuid')
+const Boom = require('@hapi/boom')
+
+let Registration
 
 module.exports = Registration = {
-    create: async ({tenantId, courseId, actor, code = uuidv4()}, db, lrsWreck, txn) => {
-        let registrationId;
+  create: async ({ tenantId, courseId, actor, code = uuidv4() }, db, lrsWreck, txn) => {
+    let registrationId, mapMoveOnChildren
 
-        try {
-            await db.transaction(
-                async (txn) => {
-                    const course = await Registration.getCourse(txn, tenantId, courseId),
-                        courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId),
-                        registration = {
-                            tenantId,
-                            code,
-                            courseId,
-                            actor: JSON.stringify(actor),
-                            metadata: JSON.stringify({
-                                version: 1,
-                                moveOn: {
-                                    type: "course",
-                                    lmsId: course.lmsId,
-                                    pubId: course.structure.course.id,
-                                    satisfied: false,
-                                    children: course.structure.course.children.map(mapMoveOnChildren)
-                                }
-                            })
-                        },
-                        regResult = await txn("registrations").insert(registration);
-                    registrationId = registration.id = regResult[0];
+    try {
+      await db.transaction(
+        async (txn) => {
+          const course = await Registration.getCourse(txn, tenantId, courseId)
+          const courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId)
+          const registration = {
+            tenantId,
+            code,
+            courseId,
+            actor: JSON.stringify(actor),
+            metadata: JSON.stringify({
+              version: 1,
+              moveOn: {
+                type: 'course',
+                lmsId: course.lmsId,
+                pubId: course.structure.course.id,
+                satisfied: false,
+                children: course.structure.course.children.map(mapMoveOnChildren)
+              }
+            })
+          }
+          const regResult = await txn('registrations').insert(registration)
 
-                    await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs) 
+          registrationId = registration.id = regResult[0]
 
-                    await Registration.parseRegistrationData(registration, lrsWreck);
-                    
-                    await Registration.updateMetadata(txn, registration, tenantId);
-                }
-            );
-        }
-        catch (ex) {
-            throw Boom.internal(new Error(`Failed to store registration: ${ex}`));
-        }
-        return registrationId;
-    },
+          await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs)
 
-    getCourse:async(txn, tenantId, courseId) => {
-        return await txn.first("*").from("courses").queryContext({jsonCols: ["metadata", "structure"]}).where({tenantId, id: courseId});
-    },
-    getCourseAUs:async(txn, tenantId, courseId) => {
-        return await txn.select("*").from("courses_aus").queryContext({jsonCols: ["metadata"]}).where({tenantId, courseId});
-    },
-  
-    load: async (tenantId, registrationId, db, loadAus = true) => {
-        let registration;
-        ///changed below with loadRegistration
-        try {
-            registration = await Registration.loadRegistration(tenantId, registrationId, db);
-        }
-        catch (ex) {
-            throw new Error(`Failed to load registration: ${ex}`);
-        }
+          await Registration.parseRegistrationData(registration, lrsWreck)
 
-        if (loadAus) {
-            try {
-                registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration);
+          await Registration.updateMetadata(txn, registration, tenantId)
         }
-            catch (ex) {
-                throw new Error(`Failed to load registration AUs: ${ex}`);
-            }
+      )
+    } catch (ex) {
+      throw Boom.internal(new Error(`Failed to store registration: ${ex}`))
+    }
+
+    return registrationId
+  },
+
+  getCourse: async (txn, tenantId, courseId) => await txn.first('*').from('courses').queryContext({ jsonCols: ['metadata', 'structure'] }).where({ tenantId, id: courseId }),
+  getCourseAUs: async (txn, tenantId, courseId) => await txn.select('*').from('courses_aus').queryContext({ jsonCols: ['metadata'] }).where({ tenantId, courseId }),
+
+  load: async (tenantId, registrationId, db, loadAus = true) => {
+    let registration
+
+    try {
+      registration = await Registration.loadRegistration(tenantId, registrationId, db)
+    } catch (ex) {
+      throw new Error(`Failed to load registration: ${ex}`)
+    }
+
+    if (loadAus) {
+      try {
+        registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration)
+      } catch (ex) {
+        throw new Error(`Failed to load registration AUs: ${ex}`)
+      }
+    }
+
+    return registration
+  },
+
+  loadRegistration: async (tenantId, registrationId, db) => await db
+    .first('*')
+    .queryContext({ jsonCols: ['actor', 'metadata'] })
+    .from('registrations')
+    .where(
+      {
+        tenantId
+      }
+    ).andWhere(
+      function () {
+        where('id', registrationId).orWhere('code', registrationId.toString())
+      }
+    ),
+
+  loadRegistrationAus: async (tenantId, registrationId, db, registration) => await db
+    .select(
+      'has_been_attempted',
+      'duration_normal',
+      'duration_browse',
+      'duration_review',
+      'is_passed',
+      'is_completed',
+      'is_waived',
+      'waived_reason',
+      'is_satisfied',
+      'metadata'
+    )
+    .from('registrations_courses_aus')
+    .where({ tenantId, registrationId: registration.id })
+    .queryContext({ jsonCols: ['metadata'] }),
+
+  loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
+    let queryResult
+
+    try {
+      queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId)
+    } catch (ex) {
+      await txn.rollback()
+      throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`)
+    }
+
+    if (!queryResult) {
+      await txn.rollback()
+      throw Boom.notFound(`registration: ${registrationId}`)
+    }
+    const {
+      registrationsCoursesAus: regCourseAu,
+      registrations: registration,
+      coursesAus: courseAu
+    } = queryResult
+
+    regCourseAu.courseAu = courseAu
+
+    return { regCourseAu, registration, courseAu }
+  },
+
+  getQueryResult: async (txn, registrationId, auIndex, tenantId) => await txn
+    .first('*')
+    .from('registrations_courses_aus')
+    .leftJoin('registrations', 'registrations_courses_aus.registration_id', 'registrations.id')
+    .leftJoin('courses_aus', 'registrations_courses_aus.course_au_id', 'courses_aus.id')
+    .where(
+      {
+        'registrations_courses_aus.tenant_id': tenantId,
+        'courses_aus.au_index': auIndex
+      }
+    )
+    .andWhere(function () {
+      where('registrations.id', registrationId).orWhere('registrations.code', registrationId.toString())
+    })
+    .queryContext(
+      {
+        jsonCols: [
+          'registrations_courses_aus.metadata',
+          'registrations.actor',
+          'registrations.metadata',
+          'courses_aus.metadata'
+        ]
+      }
+    )
+    .forUpdate()
+    .options({ nestTables: true }),
+
+  interpretMoveOn: async (registration, { auToSetSatisfied, sessionCode, lrsWreck }) => {
+    const moveOn = registration.metadata.moveOn
+
+    //
+    // use a stringified value as the template which allows for parsing
+    // on the other end to allow easy cloning to allow use of the template
+    // for multiple satisfied statements in the case of blocks in a course
+    // and nested blocks
+    //
+    const satisfiedStTemplate = Registration.templateToString(registration, sessionCode)
+
+    if (moveOn.satisfied) {
+      return
+    }
+    await RegistrationHelpers.isSatisfied(moveOn, { auToSetSatisfied, lrsWreck, satisfiedStTemplate })
+  },
+
+  templateToString (registration, sessionCode) {
+    const satisfiedStTemplate = JSON.stringify({
+      actor: registration.actor,
+      verb: {
+        id: 'https://w3id.org/xapi/adl/verbs/satisfied',
+        display: {
+          en: 'satisfied'
         }
-        return registration;
-    },
-    ///To help above
-    loadRegistration: async(tenantId, registrationId, db) => {
-        return await db
-        .first("*")
-        .queryContext({jsonCols: ["actor", "metadata"]})
-        .from("registrations")
-        .where(
+      },
+      context: {
+        registration: registration.code,
+        contextActivities: {
+          category: [
             {
-                tenantId
+              id: 'https://w3id.org/xapi/cmi5/context/categories/cmi5'
             }
-        ).andWhere(
-            function () {
-                this.where("id", registrationId).orWhere("code", registrationId.toString());
-            }
-        );
-    },
-    ///Above
-
-    loadRegistrationAus: async(tenantId, registrationId, db, registration) =>{
-        /////welll, lets see
-        //console.log("here in loadRegistrationAUs registration is: ", registration);
-        return await db
-        .select(
-            "has_been_attempted",
-            "duration_normal",
-            "duration_browse",
-            "duration_review",
-            "is_passed",
-            "is_completed",
-            "is_waived",
-            "waived_reason",
-            "is_satisfied",
-            "metadata"
-        )
-        .from("registrations_courses_aus")
-        .where({tenantId, registrationId: registration.id})
-        .queryContext({jsonCols: ["metadata"]});
-    },
-    ////////////////
-    loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
-        let queryResult;
-
-        try {
-            queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
-        }catch (ex) {
-            await txn.rollback();
-            throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`);
+          ],
+          grouping: []
+        },
+        extensions: {
+          'https://w3id.org/xapi/cmi5/context/extensions/sessionid': sessionCode
         }
+      }
+    })
 
-        if (! queryResult) {
-            await txn.rollback();
-            throw Boom.notFound(`registration: ${registrationId}`);
-        }
-        const {
-            registrationsCoursesAus: regCourseAu,
-            registrations: registration,
-            coursesAus: courseAu
-        } = queryResult;
+    return satisfiedStTemplate
+  },
 
-        regCourseAu.courseAu = courseAu;
+  retrieveRegistrationDataAsString: async (registration, lrsWreck) => await Registration.interpretMoveOn(
+    registration,
+    {
+      sessionCode: uuidv4(),
+      lrsWreck
+    }
+  ),
 
-        return {regCourseAu, registration, courseAu};
-    },
-    //forr above, exceedingly like session.js but trying less wrapping first to deal with issues
-    getQueryResult: async(txn, registrationId, auIndex, tenantId) =>{
-        return await txn
-        .first("*")
-        .from("registrations_courses_aus")
-        .leftJoin("registrations", "registrations_courses_aus.registration_id", "registrations.id")
-        .leftJoin("courses_aus", "registrations_courses_aus.course_au_id", "courses_aus.id")
-        .where(
-            {
-                "registrations_courses_aus.tenant_id": tenantId,
-                "courses_aus.au_index": auIndex
-            }
-        )
-        .andWhere(function () {
-            this.where("registrations.id", registrationId).orWhere("registrations.code", registrationId.toString());
-        })
-        .queryContext(
-            {
-                jsonCols: [
-                    "registrations_courses_aus.metadata",
-                    "registrations.actor",
-                    "registrations.metadata",
-                    "courses_aus.metadata"
-                ]
-            }
-        )
-        .forUpdate()
-        .options({nestTables: true})
+  parseRegistrationData: async (registration, lrsWreck) => {
+    try {
+      registration.actor = JSON.parse(registration.actor)
+      registration.metadata = JSON.parse(registration.metadata)
 
-    },
+      await Registration.retrieveRegistrationDataAsString(registration, lrsWreck)
+    } catch (ex) {
+      throw new Error(`Failed to interpret moveOn: ${ex}`)
+    }
 
-    interpretMoveOn: async (registration, {auToSetSatisfied, sessionCode, lrsWreck}) => {
-        const moveOn = registration.metadata.moveOn,
+    return registration
+  },
 
-            //
-            // use a stringified value as the template which allows for parsing
-            // on the other end to allow easy cloning to allow use of the template
-            // for multiple satisfied statements in the case of blocks in a course
-            // and nested blocks
-            //
-            satisfiedStTemplate = Registration.templateToString(registration, sessionCode);
+  updateMetadata: async (txn, registration, tenantId) => {
+    try {
+      return await txn('registrations').update({ metadata: JSON.stringify(registration.metadata) }).where({ tenantId, id: registration.id })
+    } catch (ex) {
+      throw new Error(`Failed to update registration metadata: ${ex}`)
+    }
+  },
 
-        if (moveOn.satisfied) {
-            return;
-        }
-        await RegistrationHelpers.isSatisfied(moveOn, {auToSetSatisfied, lrsWreck, satisfiedStTemplate});
-    },
-
-    templateToString(registration, sessionCode) {
-        let satisfiedStTemplate = JSON.stringify({
-            actor: registration.actor,
-            verb: {
-                id: "https://w3id.org/xapi/adl/verbs/satisfied",
-                display: {
-                    "en": "satisfied"
-                }
-            },
-            context: {
-                registration: registration.code,
-                contextActivities: {
-                    category: [
-                        {
-                            id: "https://w3id.org/xapi/cmi5/context/categories/cmi5"
-                        }
-                    ],
-                    grouping: []
-                },
-                extensions: {
-                    "https://w3id.org/xapi/cmi5/context/extensions/sessionid": sessionCode
-                }
-            }
-        });
-    
-        return satisfiedStTemplate;
-    },
-
-    retrieveRegistrationDataAsString: async(registration, lrsWreck) => {
-        
-        return await Registration.interpretMoveOn(
-            registration,
-            {
-                sessionCode: uuidv4(),
-                lrsWreck
-            }
-        );
-    },
-
-    parseRegistrationData: async (registration, lrsWreck) =>{
-        try {
-            registration.actor = JSON.parse(registration.actor);
-            registration.metadata = JSON.parse(registration.metadata);
-
-            await Registration.retrieveRegistrationDataAsString(registration, lrsWreck);
-        }
-        catch (ex) {
-            throw new Error(`Failed to interpret moveOn: ${ex}`);
-        }
-        return registration;
-
-    },
-
-    updateMetadata: async(txn, registration, tenantId) => {
-        try {
-            return await txn("registrations").update({metadata: JSON.stringify(registration.metadata)}).where({tenantId, id: registration.id});
-        }
-        catch (ex) {
-            throw new Error(`Failed to update registration metadata: ${ex}`);
-        }
-    },
-
-    updateCourseAUmap: async(txn, tenantId, registrationId, courseAUs) => {
-        return await txn("registrations_courses_aus").insert(
-            courseAUs.map(
-                (ca) => ({
-                    tenantId,
-                    registrationId,
-                    course_au_id: ca.id,
-                    metadata: JSON.stringify({
-                        version: 1,
-                        moveOn: ca.metadata.moveOn
-                    }),
-                    is_satisfied: ca.metadata.moveOn === "NotApplicable"
-                })
-            )
-        );
-    },
-};
+  updateCourseAUmap: async (txn, tenantId, registrationId, courseAUs) => await txn('registrations_courses_aus').insert(
+    courseAUs.map(
+      (ca) => ({
+        tenantId,
+        registrationId,
+        course_au_id: ca.id,
+        metadata: JSON.stringify({
+          version: 1,
+          moveOn: ca.metadata.moveOn
+        }),
+        is_satisfied: ca.metadata.moveOn === 'NotApplicable'
+      })
+    )
+  )
+}
