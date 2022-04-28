@@ -8,7 +8,7 @@
   },
   "scripts": {
     "lint": "eslint --ext js .",
-    "test": "mocha './test/registration.spec.js' ",
+    "test": "mocha './test/registrationHelpers.spec.js' ",
     "test:unit": "mocha './test/*.spec.js' "
   },
   "author": "",

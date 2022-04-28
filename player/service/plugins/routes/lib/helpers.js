@@ -13,17 +13,16 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
-"use strict";
 
-const Boom = require("@hapi/boom"),
-    Requirements = require("@cmi5/requirements");
+const Boom = require('@hapi/boom')
+const Requirements = require('@cmi5/requirements')
 
 module.exports = {
-    buildViolatedReqId: (violatedReqId, msg, boomType = "forbidden") => {
-        if (! Requirements[violatedReqId]) {
-            throw new Error(`Unrecognized requirement id: ${violatedReqId}`);
-        }
-
-        return Boom[boomType](`${violatedReqId} - ${Requirements[violatedReqId].txt} (${msg})`, {violatedReqId});
+  buildViolatedReqId: (violatedReqId, msg, boomType = 'forbidden') => {
+    if (!Requirements[violatedReqId]) {
+      throw new Error(`Unrecognized requirement id: ${violatedReqId}`)
     }
-};
+
+    return Boom[boomType](`${violatedReqId} - ${Requirements[violatedReqId].txt} (${msg})`, { violatedReqId })
+  }
+}

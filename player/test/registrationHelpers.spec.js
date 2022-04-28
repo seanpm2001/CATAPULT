@@ -1,496 +1,470 @@
-const { expect } =require('chai'); //utilize chai assertion library 'expect'
-const sinon = require('sinon'); //base sinon
-const chai = require ("chai"); //base chai
-const sinonChai = require("sinon-chai");
-const chaiAsPromised = require("chai-as-promised");
-const RegistrationHelpers = require('../service/plugins/routes/lib/registrationHelpers.js');//So Session is exported, can we get it's function here through this?
-const { assert } = require('chai');
-const Wreck = require("@hapi/wreck");
-var spy = sinon.spy;
-chai.use(chaiAsPromised);
-chai.should();
+const { expect } = require('chai')
+const sinon = require('sinon')
+const chai = require('chai')
+const sinonChai = require('sinon-chai')
+const chaiAsPromised = require('chai-as-promised')
+const RegistrationHelpers = require('../service/plugins/routes/lib/registrationHelpers.js')
+const { assert } = require('chai')
+const Wreck = require('@hapi/wreck')
+chai.use(chaiAsPromised)
+chai.should()
 
-describe('Test of mapMoveOnChildren function', function() {
+describe('Test of mapMoveOnChildren function', function () {
+  let moveOnChildrenSpy, testChild, satisfied
 
-	var moveOnChildrenSpy, testChild;
+  const child = {
+    lmsId: 0,
+    id: 0,
+    pubId: 1,
+    type: 'au',
+    moveOn: 'NotApplicable',
+    satisfied: true || false,
+    children: { map: () => satisfied = true }
+  }
 
-	var child = {
-          lmsId: 0,
-          id: 0,
-          pubId: 1,
-          type: "au",
-          moveOn : "NotApplicable",
-          satisfied: true|false,
-          children: {map: () => {return this.satisfied = true}},
-          };
+  beforeEach(() => {
+    moveOnChildrenSpy = sinon.spy(RegistrationHelpers, 'mapMoveOnChildren')
+  })
 
-	beforeEach(() =>{
-		moveOnChildrenSpy = sinon.spy(RegistrationHelpers, "mapMoveOnChildren");
-	});
+  afterEach(() => {
+    moveOnChildrenSpy.restore()
+  })
 
-	afterEach(() =>{
-		moveOnChildrenSpy.restore();
-	});
+  it('accepts a "child" parameter and maps to its corresponding information', function () {
+    testChild = RegistrationHelpers.mapMoveOnChildren(child)
 
-	it('accepts a "child" parameter and maps to its corresponding information', function()  {
-		
-		testChild =  RegistrationHelpers.mapMoveOnChildren(child);
-          
-          RegistrationHelpers.mapMoveOnChildren.restore();
+    RegistrationHelpers.mapMoveOnChildren.restore()
 
-		expect(moveOnChildrenSpy.calledOnceWithExactly(child)).to.be.true;
+    expect(moveOnChildrenSpy.calledOnceWithExactly(child)).to.be.true
 
-          expect(testChild.lmsId).to.equal(0);
-		expect(testChild.pubId).to.equal(0);
-          expect(testChild.type).to.equal("au");
-          expect(testChild.satisfied).to.equal(true);
-	})
+    expect(testChild.lmsId).to.equal(0)
+    expect(testChild.pubId).to.equal(0)
+    expect(testChild.type).to.equal('au')
+    expect(testChild.satisfied).to.equal(true)
+  })
 
-	it('if the .type of child is equal to "block", calls the map() to create array of elements and store in .children property', async function (){
-		
-          child.type ="block";
-          
-		testChild =  RegistrationHelpers.mapMoveOnChildren(child);
-          
-          RegistrationHelpers.mapMoveOnChildren.restore();
+  it('if the .type of child is equal to "block", calls the map() to create array of elements and store in .children property', async function () {
+    child.type = 'block'
 
-		expect(moveOnChildrenSpy.calledOnceWithExactly(child)).to.be.true;
+    testChild = RegistrationHelpers.mapMoveOnChildren(child)
 
-          expect(testChild.lmsId).to.equal(0);
-		expect(testChild.pubId).to.equal(0);
-          expect(testChild.type).to.equal("block");
-          expect(testChild.children).to.equal(true);
-	})
+    RegistrationHelpers.mapMoveOnChildren.restore()
+
+    expect(moveOnChildrenSpy.calledOnceWithExactly(child)).to.be.true
+
+    expect(testChild.lmsId).to.equal(0)
+    expect(testChild.pubId).to.equal(0)
+    expect(testChild.type).to.equal('block')
+    expect(testChild.children).to.equal(true)
+  })
 })
 
-describe('Test of tryParseTemplate function', function() {
+describe('Test of tryParseTemplate function', function () {
+  let tptSpy, parseStub, statement, satisfiedStTemplate
 
-	var tptSpy, parseStub, statement, satisfiedStTemplate;
+  beforeEach(() => {
+    parseStub = sinon.stub(JSON, 'parse')
+    tptSpy = sinon.spy(RegistrationHelpers, 'tryParseTemplate')
+  })
 
-     beforeEach(() =>{
-		parseStub = sinon.stub(JSON, 'parse')
-		tptSpy = sinon.spy(RegistrationHelpers, 'tryParseTemplate');
-	});
+  afterEach(() => {
+    parseStub.reset()
+    parseStub.restore()
+    tptSpy.restore()
+  })
 
-	afterEach(() =>{
-		parseStub.reset();
-		parseStub.restore();
-          tptSpy.restore();
-	});
+  it('tries to parse a JSON statement template', async function () {
+    parseStub.withArgs(satisfiedStTemplate).returns('a parsed template')
+    statement = RegistrationHelpers.tryParseTemplate(satisfiedStTemplate)
 
-	it('tries to parse a JSON statement template', async function()  {
-		
-          parseStub.withArgs(satisfiedStTemplate).returns('a parsed template');
-          statement =  RegistrationHelpers.tryParseTemplate(satisfiedStTemplate);
+    RegistrationHelpers.tryParseTemplate.restore()
+    JSON.parse.restore()
 
-          RegistrationHelpers.tryParseTemplate.restore();
-          JSON.parse.restore();
-		
-          expect(tptSpy.calledOnceWithExactly(satisfiedStTemplate)).to.be.true;
+    expect(tptSpy.calledOnceWithExactly(satisfiedStTemplate)).to.be.true
 
-		expect(parseStub.calledOnceWithExactly(satisfiedStTemplate)).to.be.true;
+    expect(parseStub.calledOnceWithExactly(satisfiedStTemplate)).to.be.true
 
-		expect(statement).to.equal('a parsed template');
-	})
+    expect(statement).to.equal('a parsed template')
+  })
 
-	it('throws an error if it cannot parse the template',  function (){
-		
-          parseStub.withArgs(satisfiedStTemplate).rejects();
+  it('throws an error if it cannot parse the template', function () {
+    parseStub.withArgs(satisfiedStTemplate).rejects()
 
-		try{
-			statement =  RegistrationHelpers.tryParseTemplate(satisfiedStTemplate);
-			assert.fail(error);//ensure promise was rejected, ie no false positive test
-		}
-	  	catch (ex) {
-			function error () {			
-			throw new Error(`Failed to parse statement template: ${ex}`);
-			}
-			
-			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw(`Failed to parse statement template: ${ex}`);
-		}
+    try {
+      statement = RegistrationHelpers.tryParseTemplate(satisfiedStTemplate)
+      assert.fail(error)// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        throw new Error(`Failed to parse statement template: ${ex}`)
+      }
 
-		RegistrationHelpers.tryParseTemplate.restore();
-          JSON.parse.restore();
+      // error has to be wrapped and tested here, or it will throw and interrupt test execution
+      expect(error).to.throw(`Failed to parse statement template: ${ex}`)
+    }
 
-		expect(tptSpy.calledOnceWithExactly(satisfiedStTemplate)).to.be.true;
+    RegistrationHelpers.tryParseTemplate.restore()
+    JSON.parse.restore()
 
-		expect(parseStub.calledOnceWithExactly(satisfiedStTemplate)).to.be.true;
-     })
+    expect(tptSpy.calledOnceWithExactly(satisfiedStTemplate)).to.be.true
+
+    expect(parseStub.calledOnceWithExactly(satisfiedStTemplate)).to.be.true
+  })
 })
 
-describe('Test of assignStatementValues function', function() {
+describe('Test of assignStatementValues function', function () {
+  let asvSpy
+  const statement = {
+    id: 0,
+    timestamp: 0,
+    object: {
+      id: 0,
+      definition: {
+        type: ' '
+      }
+    },
+    moveOn: 'NotApplicable',
+    context: {
+      contextActivities: {
+        grouping: 0
+      }
+    },
+    children: 0
+  }
+  const node = {
+    lmsId: 0,
+    type: 'au',
+    pubId: 0
+  }
 
-	var asvSpy;
-	var statement = {
-          id: 0,
-          timestamp: 0,
-          object: {
-               id: 0,
-               definition: {
-                   type: " "
-                    }
-               },
-          moveOn : "NotApplicable",
-          context: {
-               contextActivities: {
-                    grouping: 0
-               }
-          },
-          children: 0,
-          }
-     var node = {
-          lmsId: 0,
-          type: "au",
-          pubId: 0,
-          }  
+  beforeEach(() => {
+    asvSpy = sinon.spy(RegistrationHelpers, 'assignStatementValues')
+  })
 
-	beforeEach(() =>{
-		asvSpy = sinon.spy(RegistrationHelpers, "assignStatementValues");
-	});
+  afterEach(() => {
+    asvSpy.restore()
+  })
 
-	afterEach(() =>{
-		asvSpy.restore();
-	});
+  it('assigns statement values from passed in node and statement parameters (called by loopThroughChildren)', function () {
+    testStatement = RegistrationHelpers.assignStatementValues(node, statement)
 
-	it('assigns statement values from passed in node and statement parameters (called by loopThroughChildren)', function()  {
-		
-		testStatement =  RegistrationHelpers.assignStatementValues(node, statement);
-          
-          RegistrationHelpers.assignStatementValues.restore();
+    RegistrationHelpers.assignStatementValues.restore()
 
-		expect(asvSpy.calledOnceWithExactly(node, statement)).to.be.true;
-	})
+    expect(asvSpy.calledOnceWithExactly(node, statement)).to.be.true
+  })
 })
 
-describe('Test of nodeSatisfied function', function() {
+describe('Test of nodeSatisfied function', function () {
+  let nodeSatisfiedSpy, testNode
 
-	var nodeSatisfiedSpy, testNode;
-	
-     var node = {
-          satisfied : true | false
-          }  
-     
-	beforeEach(() =>{
-		nodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "nodeSatisfied");
-	});
+  const node = {
+    satisfied: true | false
+  }
 
-	afterEach(() =>{
-		nodeSatisfiedSpy.restore();
-	});
+  beforeEach(() => {
+    nodeSatisfiedSpy = sinon.spy(RegistrationHelpers, 'nodeSatisfied')
+  })
 
-	it('returns true if node it is passed satisified property is true (called by isSatisfied)', async function()  {
-		
-          node.satisfied = true;
+  afterEach(() => {
+    nodeSatisfiedSpy.restore()
+  })
 
-		testNode =  await RegistrationHelpers.nodeSatisfied(node);
-          
-          RegistrationHelpers.nodeSatisfied.restore();
+  it('returns true if node it is passed satisified property is true (called by isSatisfied)', async function () {
+    node.satisfied = true
 
-		expect(nodeSatisfiedSpy.calledOnceWithExactly(node)).to.be.true;
+    testNode = await RegistrationHelpers.nodeSatisfied(node)
 
-          expect(testNode).to.be.true;
+    RegistrationHelpers.nodeSatisfied.restore()
 
-	})
+    expect(nodeSatisfiedSpy.calledOnceWithExactly(node)).to.be.true
+
+    expect(testNode).to.be.true
+  })
 })
 
-describe('Test of AUnodeSatisfied function', function() {
+describe('Test of AUnodeSatisfied function', function () {
+  let auNodeSatisfiedSpy
 
-	var auNodeSatisfiedSpy;
-	
-     var node = {
-          satisfied : true|false,
-          type: "",
-          lmsId: true|false
-          }  
-     var testNode, auToSetSatisfied = true|false;
+  const node = {
+    satisfied: true | false,
+    type: '',
+    lmsId: true | false
+  }
+  let testNode; let auToSetSatisfied = true | false
 
-	beforeEach(() =>{
-		auNodeSatisfiedSpy = sinon.spy(RegistrationHelpers, "AUnodeSatisfied");
-	});
+  beforeEach(() => {
+    auNodeSatisfiedSpy = sinon.spy(RegistrationHelpers, 'AUnodeSatisfied')
+  })
 
-	afterEach(() =>{
-		auNodeSatisfiedSpy.restore();
-	});
+  afterEach(() => {
+    auNodeSatisfiedSpy.restore()
+  })
 
-	it('verifies the nodes "type" property is "au". If so it sets the "lmsId" and "satisified" properties and returns the "satisified property (called by isSatisfied)', async function()  {
-		
-          node.type = "au";
-          node.lmsId = true;
-          auToSetSatisfied = true;
+  it('verifies the nodes "type" property is "au". If so it sets the "lmsId" and "satisified" properties and returns the "satisified property (called by isSatisfied)', async function () {
+    node.type = 'au'
+    node.lmsId = true
+    auToSetSatisfied = true
 
-		testNode =  await RegistrationHelpers.AUnodeSatisfied(node, auToSetSatisfied);
+    testNode = await RegistrationHelpers.AUnodeSatisfied(node, auToSetSatisfied)
 
-		RegistrationHelpers.AUnodeSatisfied.restore();
+    RegistrationHelpers.AUnodeSatisfied.restore()
 
-		expect(auNodeSatisfiedSpy.calledOnceWithExactly(node, auToSetSatisfied)).to.be.true;
+    expect(auNodeSatisfiedSpy.calledOnceWithExactly(node, auToSetSatisfied)).to.be.true
 
-          expect(testNode).to.be.true;
-	})
+    expect(testNode).to.be.true
+  })
 })
 
-describe('Test of loopThroughChildren function', function() {
-     
-     var auToSetSatisfied, satisfiedStTemplate, lrsWreck, child, allChildrenSatisfied, txn;
-     var node = {
-               satisfied : true | false,
-               type: "",
-               lmsId: true|false,
-               children: [child, child, child]
-               } 
-	chai.use(sinonChai);
+describe('Test of loopThroughChildren function', function () {
+  let auToSetSatisfied, satisfiedStTemplate, lrsWreck, child, allChildrenSatisfied, txn
+  const node = {
+    satisfied: true | false,
+    type: '',
+    lmsId: true | false,
+    children: [child, child, child]
+  }
 
-	beforeEach(() =>{
-          isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfied");
+  chai.use(sinonChai)
 
-          ltcSpy = sinon.spy(RegistrationHelpers, "loopThroughChildren")
-	});
+  beforeEach(() => {
+    isSatisfiedStub = sinon.stub(RegistrationHelpers, 'isSatisfied')
 
-	afterEach(() =>{
-          isSatisfiedStub.reset();
-          isSatisfiedStub.restore();
+    ltcSpy = sinon.spy(RegistrationHelpers, 'loopThroughChildren')
+  })
 
-          ltcSpy.restore();
-	});
+  afterEach(() => {
+    isSatisfiedStub.reset()
+    isSatisfiedStub.restore()
 
-	it('recursively loops through a node and if any of the nodes children are unsatisified, it marks "allChildrenSatisifed false and returns that value" (called in isSatisifed function)', async function()  {
-		
-          isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false);
+    ltcSpy.restore()
+  })
 
-          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
+  it('recursively loops through a node and if any of the nodes children are unsatisified, it marks "allChildrenSatisifed false and returns that value" (called in isSatisifed function)', async function () {
+    isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false)
 
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.loopThroughChildren.restore();
+    allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
 
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-          
-		//this should be called three times. There are three items in node.children
-		isSatisfiedStub.should.have.callCount(3);
-		isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
-  		
-		expect(allChildrenSatisfied).to.be.false;
-	})
+    RegistrationHelpers.isSatisfied.restore()
+    RegistrationHelpers.loopThroughChildren.restore()
 
-	it('recursively loops through a node and if all of the nodes children are satisified, it marks "allChildrenSatisifed" true and returns that value (called in isSatisifed function)', async function (){
-		
-		isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(true);
+    expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true
 
-          allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
+    // this should be called three times. There are three items in node.children
+    isSatisfiedStub.should.have.callCount(3)
+    isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
 
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.loopThroughChildren.restore();
+    expect(allChildrenSatisfied).to.be.false
+  })
 
-          expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-          
-		//this should be called three times. There are three items in node.children
-		isSatisfiedStub.should.have.callCount(3);
-		isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
-  		
-		expect(allChildrenSatisfied).to.be.true;
-	})
+  it('recursively loops through a node and if all of the nodes children are satisified, it marks "allChildrenSatisifed" true and returns that value (called in isSatisifed function)', async function () {
+    isSatisfiedStub.withArgs(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(true)
+
+    allChildrenSatisfied = await RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
+
+    RegistrationHelpers.isSatisfied.restore()
+    RegistrationHelpers.loopThroughChildren.restore()
+
+    expect(ltcSpy.calledOnceWithExactly(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true
+
+    // this should be called three times. There are three items in node.children
+    isSatisfiedStub.should.have.callCount(3)
+    isSatisfiedStub.should.have.been.calledWith(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
+
+    expect(allChildrenSatisfied).to.be.true
+  })
 })
 
-describe('Test of retrieveResponse function', function() {
-   
-	var rrSpy, wreckStub;
-	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} };
-	var satisfiedStResponse ="st response", satisfiedStResponseBody = "st response body";
+describe('Test of retrieveResponse function', function () {
+  let rrSpy, wreckStub
+  const txn = { rollback: () => true | false } // a transaction object
+  const lrsWreck = { request: async (string1, string2) => 'response received' /* assume request received */ }
+  let satisfiedStResponse = 'st response'; let satisfiedStResponseBody = 'st response body'
 
-	beforeEach(() =>{
-		rrSpy = sinon.spy(RegistrationHelpers,'retrieveResponse');
-		wreckStub =sinon.stub(Wreck, 'read')
-	});
+  beforeEach(() => {
+    rrSpy = sinon.spy(RegistrationHelpers, 'retrieveResponse')
+    wreckStub = sinon.stub(Wreck, 'read')
+  })
 
-	afterEach(() =>{
-		rrSpy.restore();
+  afterEach(() => {
+    rrSpy.restore()
 
-		wreckStub.reset();
-		wreckStub.restore();
-	});
+    wreckStub.reset()
+    wreckStub.restore()
+  })
 
-	it('tries to retrieve and return the response from a POST request to the LRS server', async function()  {
-		rrSpy.restore();//this is the only one we want to use a stub for, so take away spy
-		rrStub = sinon.stub(RegistrationHelpers, 'retrieveResponse');
+  it('tries to retrieve and return the response from a POST request to the LRS server', async function () {
+    rrSpy.restore()// this is the only one we want to use a stub for, so take away spy
+    rrStub = sinon.stub(RegistrationHelpers, 'retrieveResponse')
 
-		rrStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
-		
-		[satisfiedStResponse, satisfiedStResponseBody] = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
-		
-		RegistrationHelpers.retrieveResponse.restore();
+    rrStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
 
-		expect(satisfiedStResponse).to.equal("st response");
-		expect(satisfiedStResponseBody).to.equal("st response body");
+    [satisfiedStResponse, satisfiedStResponseBody] = await RegistrationHelpers.retrieveResponse(lrsWreck, txn)
 
-		expect(rrStub.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
-	});
+    RegistrationHelpers.retrieveResponse.restore()
 
-	it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function() {
-		
-		try{
-			await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
-			assert.fail(error);//ensure promise was rejected, ie no false positive test
-		}
-	  	catch (ex) {
-			
-			function error () {	
-				txn.rollback = true;		
-				throw new Error(`Failed request to store abandoned statement: ${ex}`);
-			}
-			
-			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw(`Failed request to store abandoned statement: ${ex}`);
-		}
+    expect(satisfiedStResponse).to.equal('st response')
+    expect(satisfiedStResponseBody).to.equal('st response body')
 
-		RegistrationHelpers.retrieveResponse.restore();
-		
-		expect(txn.rollback).to.be.true;
+    expect(rrStub.calledOnceWithExactly(lrsWreck, txn)).to.be.true
+  })
 
-		expect(rrSpy.calledOnceWithExactly(lrsWreck, txn)).to.be.true;
-	});
+  it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function () {
+    try {
+      await RegistrationHelpers.retrieveResponse(lrsWreck, txn)
+      assert.fail(error)// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        txn.rollback = true
+        throw new Error(`Failed request to store abandoned statement: ${ex}`)
+      }
+
+      // error has to be wrapped and tested here, or it will throw and interrupt test execution
+      expect(error).to.throw(`Failed request to store abandoned statement: ${ex}`)
+    }
+
+    RegistrationHelpers.retrieveResponse.restore()
+
+    expect(txn.rollback).to.be.true
+
+    expect(rrSpy.calledOnceWithExactly(lrsWreck, txn)).to.be.true
+  })
 })
 
-describe('Test of checkStatusCode function', function() {
-	
-	var txn = { rollback: ()=> {return true|false}  }; //a transaction object
-	var satisfiedStResponse ={ statusCode: 300 };
-	var satisfiedStResponseBody = 'response body';
+describe('Test of checkStatusCode function', function () {
+  const txn = { rollback: () => true | false } // a transaction object
+  const satisfiedStResponse = { statusCode: 300 }
+  const satisfiedStResponseBody = 'response body'
 
-	beforeEach(() =>{
-		chkStatusSpy = sinon.spy(RegistrationHelpers, "checkStatusCode");
-	});
+  beforeEach(() => {
+    chkStatusSpy = sinon.spy(RegistrationHelpers, 'checkStatusCode')
+  })
 
-	afterEach(() =>{
-		chkStatusSpy.restore();
-	});
-	
-	it(' checks if status code (from POST response in retrieveResponse) is equal to 200, if it is not, it throws an error.', async function (){
+  afterEach(() => {
+    chkStatusSpy.restore()
+  })
 
-		try{
-			await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody);
-			assert.fail(error);//ensure promise was rejected, ie no false positive test
-		}
-	  	catch (ex) {
-			
-			function error () {	
-				txn.rollback = true;		
-				throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-			}
-			
-			//error has to be wrapped and tested here, or it will throw and interrupt test execution
-			expect(error).to.throw(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
-		}
+  it(' checks if status code (from POST response in retrieveResponse) is equal to 200, if it is not, it throws an error.', async function () {
+    try {
+      await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody)
+      assert.fail(error)// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        txn.rollback = true
+        throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`)
+      }
 
-		RegistrationHelpers.checkStatusCode.restore();
-		
-		expect(txn.rollback).to.be.true;
+      // error has to be wrapped and tested here, or it will throw and interrupt test execution
+      expect(error).to.throw(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`)
+    }
 
-		expect(chkStatusSpy.calledOnceWithExactly(satisfiedStResponse, satisfiedStResponseBody)).to.be.true;
-	});
+    RegistrationHelpers.checkStatusCode.restore()
+
+    expect(txn.rollback).to.be.true
+
+    expect(chkStatusSpy.calledOnceWithExactly(satisfiedStResponse, satisfiedStResponseBody)).to.be.true
+  })
 })
 
-describe('Test of isSatisfied function', function() {
+describe('Test of isSatisfied function', function () {
+  let isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
+    assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub, auToSetSatisfied, satisfiedStTemplate, statement, allSatisfiedTest
+  /* assume request received */
+  const lrsWreck = { request: async (string1, string2) => 'response received'}
+  const txn = { rollback: () => true | false }
+  const satisfiedStResponse = 'a satisfied response'; 
+  const satisfiedStResponseBody = 'satisfied response body' 
 
-	var isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
-          assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub, auToSetSatisfied, satisfiedStTemplate, statement;
-	var lrsWreck = {request: async (string1, string2) => {return "response received" /*assume request received*/} }, 
-		txn ={ rollback: ()=> {return true|false}  }, 
-		satisfiedStResponse = "a satisfied response", satisfiedStResponseBody ="satisfied response body"; //passed as arguments
-	
-	var child = {
-          lmsId: 0,
-          id: 0,
-          pubId: 1,
-          type: "au",
-          moveOn : "NotApplicable",
-          satisfied: true|false,
-          children: [1, 2, 3, 4, 5],
-          } 
-     var node = {
-          satisfied : true | false,
-          type: "",
-          lmsId: true|false,
-          children: [child, child, child]
-          } 
-	
-	beforeEach(() =>{
-	     nodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'nodeSatisfied');
-          AUnodeSatisfiedStub = sinon.stub(RegistrationHelpers, "AUnodeSatisfied");
-	     loopThroughChildrenStub = sinon.stub(RegistrationHelpers, 'loopThroughChildren');
-	     tryParseTemplateStub = sinon.stub(RegistrationHelpers, 'tryParseTemplate');
-		assignStatementValuesStub = sinon.stub(RegistrationHelpers, 'assignStatementValues');
-	     retrieveResponseStub = sinon.stub(RegistrationHelpers, 'retrieveResponse');
-	     checkStatusCodeStub = sinon.stub(RegistrationHelpers, 'checkStatusCode');
+  const child = {
+    lmsId: 0,
+    id: 0,
+    pubId: 1,
+    type: 'au',
+    moveOn: 'NotApplicable',
+    satisfied: true | false,
+    children: [1, 2, 3, 4, 5]
+  }
+  const node = {
+    satisfied: true | false,
+    type: '',
+    lmsId: true | false,
+    children: [child, child, child]
+  }
 
-		isSatisfiedSpy = sinon.spy(RegistrationHelpers, "isSatisfied");
+  beforeEach(() => {
+	     nodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'nodeSatisfied')
+    AUnodeSatisfiedStub = sinon.stub(RegistrationHelpers, 'AUnodeSatisfied')
+		loopThroughChildrenStub = sinon.stub(RegistrationHelpers, 'loopThroughChildren')
+		tryParseTemplateStub = sinon.stub(RegistrationHelpers, 'tryParseTemplate')
+		assignStatementValuesStub = sinon.stub(RegistrationHelpers, 'assignStatementValues')
+		retrieveResponseStub = sinon.stub(RegistrationHelpers, 'retrieveResponse')
+		checkStatusCodeStub = sinon.stub(RegistrationHelpers, 'checkStatusCode')
 
-	});
+    isSatisfiedSpy = sinon.spy(RegistrationHelpers, 'isSatisfied')
+  })
 
-	afterEach(() =>{
-		nodeSatisfiedStub.reset();
-		nodeSatisfiedStub.restore();
+  afterEach(() => {
+    nodeSatisfiedStub.reset()
+    nodeSatisfiedStub.restore()
 
-          AUnodeSatisfiedStub.reset();
-		AUnodeSatisfiedStub.restore();
+    AUnodeSatisfiedStub.reset()
+    AUnodeSatisfiedStub.restore()
 
-		loopThroughChildrenStub.reset();
-		loopThroughChildrenStub.restore();
+    loopThroughChildrenStub.reset()
+    loopThroughChildrenStub.restore()
 
-		tryParseTemplateStub.reset();
-		tryParseTemplateStub.restore();
+    tryParseTemplateStub.reset()
+    tryParseTemplateStub.restore()
 
-		assignStatementValuesStub.reset();
-		assignStatementValuesStub.restore();
+    assignStatementValuesStub.reset()
+    assignStatementValuesStub.restore()
 
-		retrieveResponseStub.reset();
-		retrieveResponseStub.restore();
+    retrieveResponseStub.reset()
+    retrieveResponseStub.restore()
 
-		checkStatusCodeStub.reset();
-		checkStatusCodeStub.restore();
+    checkStatusCodeStub.reset()
+    checkStatusCodeStub.restore()
 
-		isSatisfiedSpy.restore();
-	});
+    isSatisfiedSpy.restore()
+  })
 
-	it('recursively iterates through node (given as param), ensuring all its children are satisified. When they are, returns true', async function()  {
-		
-		nodeSatisfiedStub.withArgs(node).resolves(true);
-          AUnodeSatisfiedStub.withArgs(node, {auToSetSatisfied}).resolves(true);
-          loopThroughChildrenStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true);
-		tryParseTemplateStub.withArgs(satisfiedStTemplate).resolves(statement);
-		assignStatementValuesStub.withArgs(node, statement).resolves(true);
-		retrieveResponseStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody]);
-		checkStatusCodeStub.withArgs(satisfiedStResponse, satisfiedStResponseBody);		
-		
-          //returns true or false from main func, so this should be true or false?
-          allSatisfiedTest =  await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
+  it('recursively iterates through node (given as param), ensuring all its children are satisified. When they are, returns true', async function () {
+    nodeSatisfiedStub.withArgs(node).resolves(true)
+    AUnodeSatisfiedStub.withArgs(node, { auToSetSatisfied }).resolves(true)
+    loopThroughChildrenStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck).resolves(true)
+    tryParseTemplateStub.withArgs(satisfiedStTemplate).resolves(statement)
+    assignStatementValuesStub.withArgs(node, statement).resolves(true)
+    retrieveResponseStub.withArgs(lrsWreck, txn).resolves([satisfiedStResponse, satisfiedStResponseBody])
+    checkStatusCodeStub.withArgs(satisfiedStResponse, satisfiedStResponseBody)
 
-          RegistrationHelpers.isSatisfied.restore();
-          RegistrationHelpers.nodeSatisfied.restore();
-          RegistrationHelpers.AUnodeSatisfied.restore();
-		RegistrationHelpers.loopThroughChildren.restore();
-		RegistrationHelpers.tryParseTemplate.restore();
-		RegistrationHelpers.assignStatementValues.restore();
-		RegistrationHelpers.retrieveResponse.restore();
-		RegistrationHelpers.checkStatusCode.restore();
+    // returns true or false from main func, so this should be true or false?
+    allSatisfiedTest = await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
 
-		expect(allSatisfiedTest).to.be.true;
-		//this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
-		expect(isSatisfiedSpy.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-	})
-	it('recursively iterates through node (given as param), ensuring all its children are satisified. If they cannot be, returns false', async function()  {
-		//Because of the nature of the recursion here, it really isn't possible to return false under normal circumstances,
-		//as the program will loop util satisified. So I have stubbed the function to make it return false
-		isSatisfiedSpy.restore();
-		isSatisfiedStub = sinon.stub(RegistrationHelpers, "isSatisfied")	
-		isSatisfiedStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false);
-		
-          //returns true or false from main func, so this should be true or false?
-          allSatisfiedTest =  await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
+    RegistrationHelpers.isSatisfied.restore()
+    RegistrationHelpers.nodeSatisfied.restore()
+    RegistrationHelpers.AUnodeSatisfied.restore()
+    RegistrationHelpers.loopThroughChildren.restore()
+    RegistrationHelpers.tryParseTemplate.restore()
+    RegistrationHelpers.assignStatementValues.restore()
+    RegistrationHelpers.retrieveResponse.restore()
+    RegistrationHelpers.checkStatusCode.restore()
 
-          RegistrationHelpers.isSatisfied.restore();
+    expect(allSatisfiedTest).to.be.true
+    // this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
+    expect(isSatisfiedSpy.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true
+  })
+  it('recursively iterates through node (given as param), ensuring all its children are satisified. If they cannot be, returns false', async function () {
+    // Because of the nature of the recursion here, it really isn't possible to return false under normal circumstances,
+    // as the program will loop util satisified. So I have stubbed the function to make it return false
+    isSatisfiedSpy.restore()
+    isSatisfiedStub = sinon.stub(RegistrationHelpers, 'isSatisfied')
+    isSatisfiedStub.withArgs(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn).resolves(false)
 
-		expect(allSatisfiedTest).to.be.false;
-		//this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
-		expect(isSatisfiedStub.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true;
-	})
+    // returns true or false from main func, so this should be true or false?
+    allSatisfiedTest = await RegistrationHelpers.isSatisfied(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
+
+    RegistrationHelpers.isSatisfied.restore()
+
+    expect(allSatisfiedTest).to.be.false
+    // this could be called more than once, and that is acceptable if it needs to iterate until children satisfied
+    expect(isSatisfiedStub.calledWith(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)).to.be.true
+  })
 })
