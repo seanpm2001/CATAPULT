@@ -116,16 +116,7 @@ describe('Test of tryParseTemplate function', function () {
 
 describe('Test of assignStatementValues function', function () {
   let asvSpy
-  let testStatement = {
-    id: 0,
-    timestamp: 0,
-    object: {
-      id: 0,
-      definition: {
-        type: ' '
-      }
-    }
-  }
+
   const statement = {
     id: 0,
     timestamp: 0,
@@ -158,7 +149,7 @@ describe('Test of assignStatementValues function', function () {
   })
 
   it('assigns statement values from passed in node and statement parameters (called by loopThroughChildren)', function () {
-    testStatement = RegistrationHelpers.assignStatementValues(node, statement)
+    RegistrationHelpers.assignStatementValues(node, statement)
     RegistrationHelpers.assignStatementValues.restore()
 
     expect(asvSpy.calledOnceWithExactly(node, statement)).to.be.true
@@ -228,11 +219,11 @@ describe('Test of AUnodeSatisfied function', function () {
 })
 
 describe('Test of loopThroughChildren function', function () {
-  let auToSetSatisfied, satisfiedStTemplate, lrsWreck, child, allChildrenSatisfied, txn
+  let auToSetSatisfied, satisfiedStTemplate, isSatisfiedStub, ltcSpy, lrsWreck, child, allChildrenSatisfied, txn
   const node = {
-    satisfied: true | false,
+    satisfied: true || false,
     type: '',
-    lmsId: true | false,
+    lmsId: true || false,
     children: [child, child, child]
   }
 
@@ -288,10 +279,11 @@ describe('Test of loopThroughChildren function', function () {
 
 describe('Test of retrieveResponse function', function () {
   let rrSpy, rrStub, wreckStub, error
-  const txn = { rollback: () => true | false }
+  const txn = { rollback: () => true || false }
   // assume request received
-  const lrsWreck = { request: async (string1, string2) => 'response received' }
-  let satisfiedStResponse = 'st response'; let satisfiedStResponseBody = 'st response body'
+  const lrsWreck = { request: (string1, string2) => 'response received' }
+  let satisfiedStResponse = 'st response'
+  let satisfiedStResponseBody = 'st response body'
 
   beforeEach(() => {
     rrSpy = sinon.spy(RegistrationHelpers, 'retrieveResponse')
@@ -326,7 +318,7 @@ describe('Test of retrieveResponse function', function () {
     try {
       await RegistrationHelpers.retrieveResponse(lrsWreck, txn)
       // ensure promise was rejected, ie no false positive test
-	 assert.fail(error)
+      assert.fail(error)
     } catch (ex) {
       function error () {
         txn.rollback = true
@@ -385,7 +377,7 @@ describe('Test of isSatisfied function', function () {
   let isSatisfiedSpy, isSatisfiedStub, nodeSatisfiedStub, AUnodeSatisfiedStub, loopThroughChildrenStub, tryParseTemplateStub,
     assignStatementValuesStub, retrieveResponseStub, checkStatusCodeStub, auToSetSatisfied, satisfiedStTemplate, statement, allSatisfiedTest, testLoop
   /* assume request received */
-  const lrsWreck = { request: async (string1, string2) => 'response received' }
+  const lrsWreck = { request: (string1, string2) => 'response received' }
   const txn = { rollback: () => true || false }
   const satisfiedStResponse = 'a satisfied response'
   const satisfiedStResponseBody = 'satisfied response body'
