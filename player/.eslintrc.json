@@ -17,6 +17,7 @@
     "no-return-await":"off",
     "no-inline-comments" :"off",
     "one-var-declaration-per-line" : "off",
-    "no-return-assign": "off"
+    "no-return-assign": "off",
+    "no-unused-expressions": "off"
     }
 }
