@@ -182,7 +182,6 @@ module.exports = Registration = {
     // and nested blocks
     //
     const satisfiedStTemplate = Registration.templateToString(registration, sessionCode)
-console.log(moveOn.satisfied)
     if (moveOn.satisfied) {
       return
     }
