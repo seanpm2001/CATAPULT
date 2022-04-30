@@ -79,7 +79,7 @@ module.exports = {
         "jsx-quotes": "error",
         "key-spacing": "error",
         "keyword-spacing": "error",
-        "line-comment-position": "error",
+        "line-comment-position": "off",
         "linebreak-style": [
             // this is a warning because our build system checks out on Linux
             // then copies to Windows causing the line endings to be mismatched
@@ -288,7 +288,7 @@ module.exports = {
         "require-await": "error",
         "require-jsdoc": "off",
         "rest-spread-spacing": "error",
-        "semi": "error",
+        "semi": "off",
         "semi-spacing": [
             "error",
             {

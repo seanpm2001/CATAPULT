@@ -19,5 +19,6 @@
     "one-var-declaration-per-line" : "off",
     "no-return-assign": "off",
     "no-unused-expressions": "off"
+    
     }
 }
