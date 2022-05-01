@@ -1,21 +1,21 @@
-const { expect } = require('chai')
-const sinon = require('sinon')
-const chai = require('chai')
-const chaiAsPromised = require('chai-as-promised')
-const Session = require('../service/plugins/routes/lib/session.js')
-const { assert } = require('chai')
-const Wreck = require('@hapi/wreck')
-const spy = sinon.spy
+const { expect } = require('chai');
+const sinon = require('sinon');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+const Session = require('../service/plugins/routes/lib/session.js');
+const { assert } = require('chai');
+const Wreck = require('@hapi/wreck');
+const spy = sinon.spy;
 const knex = require('knex');
-var mockDb = require('mock-knex');
+const mockDb = require('mock-knex');
 
-chai.use(chaiAsPromised)
-chai.should()
+chai.use(chaiAsPromised);
+chai.should();
 
 describe('Test of load function', function () {
-  var loadSpy, getSessionStub, test, error
-  const sessionId = 1234
-  const db = {} // stand in for database
+  let loadSpy, getSessionStub, test, error;
+  const sessionId = 1234;
+  const db = {}; // stand in for database
 
   beforeEach(() => {
     getSessionStub = sinon.stub(Session, 'getSession');
@@ -45,10 +45,9 @@ describe('Test of load function', function () {
   })
 
   it('throws an error if it cannot retrieve database informaton,', async function () {
-
-	try {
+    try {
       await Session.load(sessionId, db);
-      assert.fail(error)// ensure promise was rejected, ie no false positive test
+      assert.fail(error);// ensure promise was rejected, ie no false positive test
     } catch (ex) {
       function error () {
         throw new Error(`Failed to select session: ${ex}`);
@@ -68,9 +67,9 @@ describe('Test of getSession function', function () {
   let getSessionSpy;
   const sessionId = 1234;
   // stand in for database
-  var db = knex({
-	client: 'mysql'
-	});
+  const db = knex({
+    client: 'mysql'
+  })
 
   beforeEach(() => {
     getSessionSpy = sinon.spy(Session, 'getSession');
@@ -82,10 +81,9 @@ describe('Test of getSession function', function () {
     getSessionSpy.restore();
 
     mockDb.unmock(db);
-})
+  })
 
   it('uses the session ID to search and return data from database', async function () {
-
     await Session.getSession(sessionId, db);
 
     Session.getSession.restore();
@@ -95,12 +93,12 @@ describe('Test of getSession function', function () {
 })
 
 describe('Test of loadForChange function', function () {
-  var tgqrStub, lfcSpy, lfcStub, lfcResult, regCourseAu, error;
+  let tgqrStub, lfcSpy;
   const txn = {}; // a transaction object
   let txnRollback = false; // to track whether the mocked txn is rolled back
   const sessionId = 1234;
   const tenantId = 'tenantID';
-  var queryResult;
+  let queryResult;
 
   beforeEach(() => {
     tgqrStub = sinon.stub(Session, 'tryGetQueryResult');
@@ -125,43 +123,44 @@ describe('Test of loadForChange function', function () {
     expect(tgqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
 
     expect(queryResult).to.equal(txn);
-  })
+  }),
 
   it('returns the successfully updated Session registration information', async function () {
-	tgqrStub.callsFake(() => {
-		const queryResult = {
-			sessions: 1, // Stand in for Session values that are returned
-			registrationsCoursesAus: regCourseAu = { courseAu: 0 },
-			registrations: 3,
-			coursesAus: 4
-		}
+    tgqrStub.callsFake(() => {
+      const queryResult =
+		{
+		  sessions: 1, // Stand in for Session values that are returned
+		  registrationsCoursesAus: regCourseAu = { courseAu: 0 },
+		  registrations: 3,
+		  coursesAus: 4
+		};
 
-	return queryResult;
-	})
+      return queryResult;
+    })
 
-	lfcResult = await Session.loadForChange();
+    lfcResult = await Session.loadForChange();
 
-	Session.loadForChange.restore();
-	Session.tryGetQueryResult.restore();
+    Session.loadForChange.restore();
+    Session.tryGetQueryResult.restore();
 
-	expect(lfcResult).to.eql({ session: 1, regCourseAu: { courseAu: 4 }, registration: 3, courseAu: 4 });
-  })
+    expect(lfcResult).to.eql({ session: 1, regCourseAu: { courseAu: 4 }, registration: 3, courseAu: 4 });
+  }),
 
   it('throws an error if queryResult was not retrieved successfully and rolls back transaction', async function () {
-	lfcSpy.restore();
-	lfcStub = sinon.stub(Session, 'loadForChange');
-	lfcStub.withArgs(txn, sessionId, tenantId).rejects();
+    lfcSpy.restore();
+    lfcStub = sinon.stub(Session, 'loadForChange');
+    lfcStub.withArgs(txn, sessionId, tenantId).rejects();
 
-	try {
-		await Session.loadForChange(txn, sessionId, tenantId);
-		assert.fail(error);
-	}catch{
-		function error () {
-			throw Error(`session: ${sessionId}`);
-	}
+    try {
+     	await Session.loadForChange(txn, sessionId, tenantId);
+      assert.fail(error);
+    } catch {
+      function error () {
+        throw Error(`session: ${sessionId}`);
+      }
 
-	txnRollback = true;
-	expect(error).to.throw(`session: ${sessionId}`);
+      txnRollback = true;
+      expect(error).to.throw(`session: ${sessionId}`);
     }
 
     Session.loadForChange.restore();
@@ -173,10 +172,10 @@ describe('Test of loadForChange function', function () {
     lfcStub.reset();
     lfcStub.restore();
   })
-})
+}),
 
 describe('Test of tryGetQueryResult function', function () {
-  let tgqrSpy, gqrStub, queryResult, error;
+  let tgqrSpy, gqrStub;
   const txn = {}; // a transaction object
   const sessionId = 1234;
   const tenantId = 'tenantID';
@@ -210,13 +209,13 @@ describe('Test of tryGetQueryResult function', function () {
   it('throws an error if it cannot retrieve,', async function () {
     gqrStub.withArgs(txn, sessionId, tenantId).rejects('Failed to select session, registration course AU, registration and course AU for update: ');
 
-	try {
-		await Session.tryGetQueryResult(txn, sessionId, tenantId);
-		assert.fail(error);// ensure promise was rejected, ie no false positive test
-	}catch (ex) {
-		function error () {
-			throw new Error(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
-	}
+    try {
+      await Session.tryGetQueryResult(txn, sessionId, tenantId);
+      assert.fail(error);// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        throw new Error(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
+      }
 
       // error has to be wrapped and tested here, or it will throw and interrupt test execution
       expect(error).to.throw(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
@@ -229,14 +228,14 @@ describe('Test of tryGetQueryResult function', function () {
 
     expect(gqrStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
   })
-})
+}),
 
 describe('Test of getQueryResult', function () {
   let gqrSpy;
   // a transaction object
-	var txn = knex({
-		client: 'mysql'
-	});
+  const txn = knex({
+    client: 'mysql'
+  });
   const txnRollback = false; // to track whether the mocked txn is rolled back
   const sessionId = 12345;
   const tenantId = 'tenantID';
@@ -254,7 +253,6 @@ describe('Test of getQueryResult', function () {
   })
 
   it('returns the txn(transaction) with requested table information if  match for args sessionId and tenantId are found in database', async function () {
-
     await Session.getQueryResult(txn, sessionId, tenantId);
 
     Session.getQueryResult.restore();
@@ -263,14 +261,14 @@ describe('Test of getQueryResult', function () {
 
     expect(txnRollback).to.be.false;
   })
-})
+}),
 
 describe('Test of abandon function', function () {
-  var abandonSpy, lfcStub;
-  var txn = {}; // a transaction object
+  let abandonSpy;
   const db = { transaction: txn = {} };
-  var lrsWreck, courseAu, session, regCourseAu, registration, by, queryResult, error;
-  var txnRollback = false // to track whether the mocked txn is rolled back
+  var lrsWreck, courseAu, session, regCourseAu, registration, sessionId, tenantId, by;
+  var txn = {}; // a transaction object
+  let txnRollback = false; // to track whether the mocked txn is rolled back
   var sessionId = 1234;
   var tenantId = 'tenantID';
 
@@ -296,7 +294,7 @@ describe('Test of abandon function', function () {
         registration,
         courseAu
       }
-    })
+    });
 
     queryResult = await Session.loadForChange(txn, sessionId, tenantId, courseAu);
 
@@ -305,7 +303,7 @@ describe('Test of abandon function', function () {
 
     expect(abandonSpy.calledOnceWithExactly(sessionId, tenantId, by, { db, lrsWreck })).to.be.true;
     expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId, courseAu)).to.be.true;
-  })
+  }),
 
   it('catches and throws an error if the Session information was not retrieved successfully and rolls back transaction', async function () {
     lfcStub.withArgs(txn, sessionId, tenantId, courseAu).rejects('Boom error (internal)');
@@ -313,14 +311,14 @@ describe('Test of abandon function', function () {
     Session.abandon(sessionId, tenantId, by, { db, lrsWreck });
 
     try {
-		await Session.loadForChange(txn, sessionId, tenantId, courseAu);
-		assert.fail(error); // ensure promise was rejected, ie no false positive
-	}catch {
-		txnRollback = true;
-		function error () {
-			throw new Error('Boom error (internal)');
-		}
-	}
+      await Session.loadForChange(txn, sessionId, tenantId, courseAu);
+      assert.fail(error); // ensure promise was rejected, ie no false positive
+		 } catch {
+      txnRollback = true;
+      function error () {
+        throw new Error('Boom error (internal)');
+      }
+		 }
 
     Session.abandon.restore();
     Session.loadForChange.restore();
@@ -341,12 +339,12 @@ describe('Test of abandon function', function () {
 })
 
 describe('Test of tryGetSessionInfo function', function () {
-  let tgsiSpy, lfcStub, queryResult, error;
+  let tgsiSpy, lfcStub;
   const txn = {}; // a transaction object
   let txnRollback = false; // to track whether the mocked txn is rolled back
   const sessionId = 1234;
   const tenantId = 'tenantID';
-  var session, regCourseAu, registration, courseAu;
+  let session, regCourseAu, registration, courseAu;
 
   beforeEach(() => {
     tgsiSpy = sinon.spy(Session, 'tryGetSessionInfo');
@@ -377,14 +375,14 @@ describe('Test of tryGetSessionInfo function', function () {
   it('throws an error if it cannot retrieve,', async function () {
     lfcStub.withArgs(txn, sessionId, tenantId).rejects('Boom error (internal)');
 
-	try {
-		await Session.tryGetSessionInfo(txn, sessionId, tenantId);
-		assert.fail(error);// ensure promise was rejected, ie no false positive test
-	}catch (ex) {
-		function error () {
-			txnRollback = true;
-			throw new Error('Boom error (internal)');
-	}
+    try {
+      await Session.tryGetSessionInfo(txn, sessionId, tenantId);
+      assert.fail(error);// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        txnRollback = true;
+        throw new Error('Boom error (internal)');
+      }
 
       // error has to be wrapped and tested here, or it will throw and interrupt test execution
       expect(error).to.throw('Boom error (internal)');
@@ -399,14 +397,14 @@ describe('Test of tryGetSessionInfo function', function () {
 
     expect(lfcStub.calledOnceWithExactly(txn, sessionId, tenantId)).to.be.true;
   })
-})
+}),
 
 describe('Test of initializeDuration function', function () {
-  let durationSeconds, initDurSpy;
+  let durationSeconds;
   const session = {
     initialized_at: { getTime: () => new Date().getTime() + 100000 },
-    is_initialized: true  
-	}	
+    is_initialized: true
+  };
 
   it(' checks if Session has been initialized and if true returns the duration since then', function () {
     initDurSpy = sinon.spy(Session, 'initializeDuration');
@@ -420,17 +418,16 @@ describe('Test of initializeDuration function', function () {
     assert.isDefined(durationSeconds);
     assert.isNumber(durationSeconds);
   })
-})
+}),
 
-describe('Test of determineSessionTerminated function', function () {
+describe('Test of determineSessionTerminated function', async function () {
   const session = { is_terminated: true };
   const txn = { rollback: () => true }; // a transaction object
-  var dstSpy;
 
   it('checks the Session status, and if terminated, rolls back the txn (transaction object)', async function () {
     dstSpy = sinon.spy(Session, 'determineSessionTerminated');
 
-    await Session.determineSessionTerminated(session, txn);
+    sessionInfo = await Session.determineSessionTerminated(session, txn);
 
     Session.determineSessionTerminated.restore();
 
@@ -439,17 +436,16 @@ describe('Test of determineSessionTerminated function', function () {
 
     dstSpy.restore();
   })
-})
+}),
 
-describe('Test of determineSessionAbandoned function', function () {
+describe('Test of determineSessionAbandoned function', async function () {
   const session = { is_abandoned: true };
   const txn = { rollback: () => true }; // a transaction object
-  var dsaSpy;
 
   it('checks the Session status, and if abandoned, rolls back the txn (transaction object)', async function () {
     dsaSpy = sinon.spy(Session, 'determineSessionAbandoned');
 
-    await Session.determineSessionAbandoned(session, txn);
+    sessionInfo = await Session.determineSessionAbandoned(session, txn);
 
     Session.determineSessionAbandoned.restore();
 
@@ -458,15 +454,15 @@ describe('Test of determineSessionAbandoned function', function () {
 
     dsaSpy.restore();
   })
-})
+}),
 
 describe('Test of retrieveResponse function', function () {
-  var rrSpy, rrStub, wreckStub, error;
+  let rrSpy, rrStub, wreckStub, error;
   const txn = { rollback: () => true || false }; // a transaction object
-  var durationSeconds, session, regCourseAu, registration;
-  const lrsWreck = { request: (string1, string2) => 'response received' /* assume request received */ };
-  var stResponse = 'st response'; 
-  var stResponseBody = 'st response body';
+  let durationSeconds, session, regCourseAu, registration;
+  const lrsWreck = { request: (string1, string2) => 'response received'; /* assume request received */ }
+  let stResponse = 'st response';
+  let stResponseBody = 'st response body';
 
   beforeEach(() => {
     rrSpy = sinon.spy(Session, 'retrieveResponse');
@@ -481,8 +477,8 @@ describe('Test of retrieveResponse function', function () {
   })
 
   it('tries to retrieve and return the response from a POST request to the LRS server', async function () {
-    rrSpy.restore()// this is the only one we want to use a stub for, so take away spy
-    rrStub = sinon.stub(Session, 'retrieveResponse')
+    rrSpy.restore();// this is the only one we want to use a stub for, so take away spy
+    rrStub = sinon.stub(Session, 'retrieveResponse');
 
     rrStub.withArgs(durationSeconds, session, regCourseAu, registration, lrsWreck, txn).resolves([stResponse, stResponseBody]);
 
@@ -497,13 +493,13 @@ describe('Test of retrieveResponse function', function () {
   })
 
   it('catches and throws an error if the server information was not retrieved and returned successfully, then rolls back transaction', async function () {
-	try {
-		await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
-		assert.fail(error)// ensure promise was rejected, ie no false positive test
-	}catch (ex) {
-		function error () {
-			txn.rollback = true;
-			throw new Error(`Failed request to store abandoned statement: ${ex}`);
+    try {
+      await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
+      assert.fail(error)// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        txn.rollback = true;
+        throw new Error(`Failed request to store abandoned statement: ${ex}`);
       }
 
       // error has to be wrapped and tested here, or it will throw and interrupt test execution
@@ -516,13 +512,13 @@ describe('Test of retrieveResponse function', function () {
 
     expect(rrSpy.calledOnceWithExactly(durationSeconds, session, regCourseAu, registration, lrsWreck, txn)).to.be.true;
   })
-})
+}),
 
 describe('Test of checkStatusCode function', function () {
   const txn = { rollback: () => true || false }; // a transaction object
   const stResponse = { statusCode: 300 };
   const stResponseBody = 'response body';
-  var chkStatusSpy, error;
+  let chkStatusSpy, error;
 
   beforeEach(() => {
     chkStatusSpy = sinon.spy(Session, 'checkStatusCode');
@@ -533,14 +529,14 @@ describe('Test of checkStatusCode function', function () {
   })
 
   it(' checks if status code (from POST response in retrieveResponse) is equal to 200, if it is not, it throws an error.', async function () {
-	try {
-		await Session.checkStatusCode(txn, stResponse, stResponseBody);
-		assert.fail(error)// ensure promise was rejected, ie no false positive test
-	}catch (ex) {
-		function error () {
-			txn.rollback = true;
-		throw new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`);
-	}
+    try {
+      await Session.checkStatusCode(txn, stResponse, stResponseBody);
+      assert.fail(error);// ensure promise was rejected, ie no false positive test
+    } catch (ex) {
+      function error () {
+        txn.rollback = true;
+        throw new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`);
+      }
 
       // error has to be wrapped and tested here, or it will throw and interrupt test execution
       expect(error).to.throw('Failed to store abandoned statement (300): response body');
@@ -552,7 +548,7 @@ describe('Test of checkStatusCode function', function () {
 
     expect(chkStatusSpy.calledOnceWithExactly(txn, stResponse, stResponseBody)).to.be.true;
   })
-})
+}),
 
 describe('Test of txnUpdate function', function () {
   let txnUpdateStub, txnUpdateSpy;

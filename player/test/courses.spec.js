@@ -1,718 +1,719 @@
 // Test file for courses.js
-"use strict";
 
-var expect = require("chai").expect;
-var sinon = require("sinon");
+const expect = require('chai').expect
+const sinon = require('sinon')
 
-var courses = require("../service/plugins/routes/v1/courses");
-const Boom = require("@hapi/boom");
+const courses = require('../service/plugins/routes/v1/courses')
+const Boom = require('@hapi/boom')
 
-describe("buildPayload for courses.js", function() {
-  it("Checks that the payload comes back with byte size and file output by default", function() {
-    let payloadObj = courses.buildPayload();
+describe('buildPayload for courses.js', function () {
+  it('Checks that the payload comes back with byte size and file output by default', function () {
+    const payloadObj = courses.buildPayload()
 
-    expect(payloadObj).to.haveOwnProperty("maxBytes");
-    expect(payloadObj).to.haveOwnProperty("output");
-  });
+    expect(payloadObj).to.haveOwnProperty('maxBytes')
+    expect(payloadObj).to.haveOwnProperty('output')
+  })
 
-  it("Checks that the payload returns a Joi object when validating", function() {
-    let args = { withValidate: true };
+  it('Checks that the payload returns a Joi object when validating', function () {
+    const args = { withValidate: true }
 
-    let payloadObj = courses.buildPayload(args);
+    const payloadObj = courses.buildPayload(args)
 
-    let payloadLabel = payloadObj._flags.label;
+    const payloadLabel = payloadObj._flags.label
 
-    expect(payloadLabel).to.equal("Request-LaunchUrl");
-  });
-});
+    expect(payloadLabel).to.equal('Request-LaunchUrl')
+  })
+})
 
-describe("getOptions for courses.js", function() {
-  it("Checks that only tags are returned if no input is given", function() {
-    let options = courses.getOptions();
+describe('getOptions for courses.js', function () {
+  it('Checks that only tags are returned if no input is given', function () {
+    const options = courses.getOptions()
 
-    expect(options).to.eql({ tags: ["api"] });
-  });
+    expect(options).to.eql({ tags: ['api'] })
+  })
 
-  it("Checks that a non-empty validate payload is returned when requested", function() {
-    let args = { withPayload: true, withValidate: true };
-    let options = courses.getOptions(args);
+  it('Checks that a non-empty validate payload is returned when requested', function () {
+    const args = { withPayload: true, withValidate: true }
+    const options = courses.getOptions(args)
 
-    expect(options).to.have.property("validate");
-    expect(options.validate).is.not.empty;
-  });
+    expect(options).to.have.property('validate')
+    expect(options.validate).is.not.empty
+  })
 
-  it("Checks that a payload and an ext method are returned when requested", function() {
-    let args = { withPayload: true, withExt: true };
-    let options = courses.getOptions(args);
+  it('Checks that a payload and an ext method are returned when requested', function () {
+    const args = { withPayload: true, withExt: true }
+    const options = courses.getOptions(args)
 
-    expect(options).to.have.property("payload");
-    expect(options).to.have.property("ext");
-  });
-});
+    expect(options).to.have.property('payload')
+    expect(options).to.have.property('ext')
+  })
+})
 
-describe("Database functions in courses.js", function() {
-  let tenantDb = {
-    first: function() {
+describe('Database functions in courses.js', function () {
+  const tenantDb = {
+    first: function () {
       return {
-        from: function() {
+        from: function () {
           return {
-            queryContext: function() {
+            queryContext: function () {
               return {
-                where: function() {
-                  return {};
-                },
-              };
+                where: function () {
+                  return {}
+                }
+              }
             },
-            where: function() {
-              return {};
-            },
-          };
+            where: function () {
+              return {}
+            }
+          }
         },
-        queryContext: function() {
+        queryContext: function () {
           return {
-            from: function() {
+            from: function () {
               return {
-                where: function() {
+                where: function () {
                   return {
                     actor: {
                       account: {
-                        homePage: "https://example.com",
-                        name: "abc",
-                      },
+                        homePage: 'https://example.com',
+                        name: 'abc'
+                      }
                     },
-                    id: "1234",
-                  };
-                },
-              };
-            },
-          };
-        },
-      };
+                    id: '1234'
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    insert: function() {
-      return ["1234"];
+    insert: function () {
+      return ['1234']
     },
-    where: function() {
+    where: function () {
       return {
-        delete: function() {
-          return null;
-        },
-      };
-    },
-  };
+        delete: function () {
+          return null
+        }
+      }
+    }
+  }
 
-  let app = {
-    contentUrl: "https://example.com",
+  const app = {
+    contentUrl: 'https://example.com',
     db: tenantDb,
     jwt: {
-      audPrefix: "abc",
-      iss: "1234",
-      tokenSecret: "BigSecret",
-    },
-  };
+      audPrefix: 'abc',
+      iss: '1234',
+      tokenSecret: 'BigSecret'
+    }
+  }
 
-  let db, courseId;
-  let tenantId = "tenantId";
+  let db, courseId
+  const tenantId = 'tenantId'
 
-  let req = {
+  const req = {
     auth: {
       credentials: {
-        tenantId: tenantId,
-      },
+        tenantId
+      }
     },
     headers: {
-      "content-type": "text/xml",
+      'content-type': 'text/xml'
     },
     params: {
       auIndex: 0,
-      id: "1234",
+      id: '1234'
     },
     payload: {
       actor: {
         account: {
-          homePage: "https://example.com",
-          name: "abc",
-        },
+          homePage: 'https://example.com',
+          name: 'abc'
+        }
       },
-      path: "Test",
-      reg: true,
+      path: 'Test',
+      reg: true
     },
     server: {
-      app: app,
+      app,
       methods: {
-        lrsWreckDefaults: function() {
-          return {};
-        },
-      },
+        lrsWreckDefaults: function () {
+          return {}
+        }
+      }
     },
-    test: true,
-  };
-  let h;
+    test: true
+  }
+  let h
 
-  afterEach(function() {
-    sinon.restore();
-  });
+  afterEach(function () {
+    sinon.restore()
+  })
 
-  it("handlePostCourse collects course information, posts it to the database, and confirms its existence", async function() {
-    let handlePostCourseSpy = sinon.spy(courses, "handlePostCourse");
+  it('handlePostCourse collects course information, posts it to the database, and confirms its existence', async function () {
+    const handlePostCourseSpy = sinon.spy(courses, 'handlePostCourse')
 
-    let test = courses.handlePostCourse(req, h);
-    console.log(test);
+    const test = courses.handlePostCourse(req, h)
 
-    expect(handlePostCourseSpy.calledOnceWithExactly(req, h)).to.be.true;
+    console.log(test)
+
+    expect(handlePostCourseSpy.calledOnceWithExactly(req, h)).to.be.true
     // expect(test).to.eql({});
-  });
+  })
 
   db = {
-    first: function() {
+    first: function () {
       return {
-        from: function() {
+        from: function () {
           return {
-            queryContext: function() {
+            queryContext: function () {
               return {
-                where: function() {
-                  return {};
-                },
-              };
+                where: function () {
+                  return {}
+                }
+              }
             },
-            where: function() {
+            where: function () {
               return {
-                delete: function() {
-                  return {};
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-  };
-  courseId = "1234";
+                delete: function () {
+                  return {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  courseId = '1234'
 
-  it("selectCourse returns a course with valid input", async function() {
-    let selectCourseSpy = sinon.spy(courses, "selectCourse");
+  it('selectCourse returns a course with valid input', async function () {
+    const selectCourseSpy = sinon.spy(courses, 'selectCourse')
 
-    let test = await courses.selectCourse(db, tenantId, courseId);
+    const test = await courses.selectCourse(db, tenantId, courseId)
 
     expect(selectCourseSpy.calledOnceWithExactly(db, tenantId, courseId)).to.be
-      .true;
-    expect(selectCourseSpy).to.not.throw();
-    expect(test).to.eql({});
-  });
+      .true
+    expect(selectCourseSpy).to.not.throw()
+    expect(test).to.eql({})
+  })
 
-  it("selectCourse throws if course does not exist in the database", async function() {
-    let badDb = {
-      first: function() {
+  it('selectCourse throws if course does not exist in the database', async function () {
+    const badDb = {
+      first: function () {
         return {
-          from: function() {
+          from: function () {
             return {
-              queryContext: function() {
+              queryContext: function () {
                 return {
-                  where: function() {
-                    return false;
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    };
+                  where: function () {
+                    return false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
-    let selectCourseSpy = sinon.spy(courses, "selectCourse");
+    const selectCourseSpy = sinon.spy(courses, 'selectCourse')
 
     try {
-      await courses.selectCourse(badDb, tenantId, courseId);
-      assert.fail(error);
+      await courses.selectCourse(badDb, tenantId, courseId)
+      assert.fail(error)
     } catch (ex) {
-      function error() {
-        throw Boom.notFound(`Unrecognized course: ${courseId} (${tenantId})`);
+      function error () {
+        throw Boom.notFound(`Unrecognized course: ${courseId} (${tenantId})`)
       }
 
-      expect(error).to.throw("Unrecognized course");
+      expect(error).to.throw('Unrecognized course')
     }
 
     expect(selectCourseSpy.calledOnceWithExactly(badDb, tenantId, courseId)).to
-      .be.true;
-  });
+      .be.true
+  })
 
-  it("handleGetCourse selects a course with valid input", async function() {
-    let handleGetCourseSpy = sinon.spy(courses, "handleGetCourse");
+  it('handleGetCourse selects a course with valid input', async function () {
+    const handleGetCourseSpy = sinon.spy(courses, 'handleGetCourse')
 
-    let test = await courses.handleGetCourse(req, h);
+    const test = await courses.handleGetCourse(req, h)
 
-    expect(handleGetCourseSpy.calledOnceWithExactly(req, h)).to.be.true;
-    expect(handleGetCourseSpy).to.not.throw();
-    expect(test).to.eql({});
-  });
+    expect(handleGetCourseSpy.calledOnceWithExactly(req, h)).to.be.true
+    expect(handleGetCourseSpy).to.not.throw()
+    expect(test).to.eql({})
+  })
 
-  it("deleteCourse returns null if successful", async function() {
-    let deleteCourseSpy = sinon.spy(courses, "deleteCourse");
+  it('deleteCourse returns null if successful', async function () {
+    const deleteCourseSpy = sinon.spy(courses, 'deleteCourse')
 
-    let test = await courses.deleteCourse(db, tenantId, courseId);
+    const test = await courses.deleteCourse(db, tenantId, courseId)
 
     expect(deleteCourseSpy.calledOnceWithExactly(db, tenantId, courseId)).to.be
-      .true;
-    expect(deleteCourseSpy).to.not.throw();
-    expect(test).to.eql(null);
-  });
+      .true
+    expect(deleteCourseSpy).to.not.throw()
+    expect(test).to.eql(null)
+  })
 
-  it("deleteCourse throws if course does not exist in the database", async function() {
-    let deleteCourseStub = sinon.stub(courses, "deleteCourse");
+  it('deleteCourse throws if course does not exist in the database', async function () {
+    const deleteCourseStub = sinon.stub(courses, 'deleteCourse')
+
     deleteCourseStub
       .withArgs(db, tenantId, courseId)
-      .rejects(Boom.internal(`Failed to delete course (${courseId}): Error`));
+      .rejects(Boom.internal(`Failed to delete course (${courseId}): Error`))
 
     try {
-      await courses.deleteCourse(db, tenantId, courseId);
-      assert.fail(error);
+      await courses.deleteCourse(db, tenantId, courseId)
+      assert.fail(error)
     } catch (ex) {
-      function error() {
-        throw new Boom.internal(`Failed to delete course (${courseId}): ${ex}`);
+      function error () {
+        throw new Boom.internal(`Failed to delete course (${courseId}): ${ex}`)
       }
 
-      expect(error).to.throw("Failed to delete course");
+      expect(error).to.throw('Failed to delete course')
     }
 
     expect(deleteCourseStub.calledOnceWithExactly(db, tenantId, courseId)).to.be
-      .true;
-  });
+      .true
+  })
 
-  it("handleCourseLaunch obtains course data and returns the session info", async function() {
-    let handleCourseLaunchSpy = sinon.spy(courses, "handleCourseLaunch");
+  it('handleCourseLaunch obtains course data and returns the session info', async function () {
+    const handleCourseLaunchSpy = sinon.spy(courses, 'handleCourseLaunch')
 
-    let test = courses.handleCourseLaunch(req, h);
+    const test = courses.handleCourseLaunch(req, h)
 
-    expect(handleCourseLaunchSpy.calledOnceWithExactly(req, h)).to.be.true;
+    expect(handleCourseLaunchSpy.calledOnceWithExactly(req, h)).to.be.true
     // expect(test).to.eql({});
-  });
-});
+  })
+})
 
-describe("Helper functions for courses.js", function() {
-  let xmlValid = "<a/>";
-  let documentValid = {
-    validate: function() {
-      return true;
+describe('Helper functions for courses.js', function () {
+  const xmlValid = '<a/>'
+  const documentValid = {
+    validate: function () {
+      return true
+    }
+  }
+  const documentInvalid = {
+    validate: function () {
+      throw new Error()
+    }
+  }
+  const zip = {
+    entryData: function () {
+      return {}
     },
-  };
-  let documentInvalid = {
-    validate: function() {
-      throw new Error();
-    },
-  };
-  let zip = {
-    entryData: function() {
-      return {};
-    },
-    extract: function() {
-      return {};
-    },
-  };
+    extract: function () {
+      return {}
+    }
+  }
 
-  afterEach(function() {
-    sinon.restore();
-  });
+  afterEach(function () {
+    sinon.restore()
+  })
 
-  it("getCourseStructureData returns data if input is valid (isZip is true)", async function() {
-    let getCourseStructureDataSpy = sinon.spy(
+  it('getCourseStructureData returns data if input is valid (isZip is true)', async function () {
+    const getCourseStructureDataSpy = sinon.spy(
       courses,
-      "getCourseStructureData"
-    );
+      'getCourseStructureData'
+    )
 
-    let test = await courses.getCourseStructureData(true, zip, "");
+    const test = await courses.getCourseStructureData(true, zip, '')
 
-    expect(getCourseStructureDataSpy).to.be.calledOnce;
-    expect(getCourseStructureDataSpy).to.not.throw();
-    expect(test).to.eql({});
-  });
+    expect(getCourseStructureDataSpy).to.be.calledOnce
+    expect(getCourseStructureDataSpy).to.not.throw()
+    expect(test).to.eql({})
+  })
 
-  it("getCourseStructureDocument returns a document if input is valid", async function() {
-    let getCourseStructureDocumentSpy = sinon.spy(
+  it('getCourseStructureDocument returns a document if input is valid', async function () {
+    const getCourseStructureDocumentSpy = sinon.spy(
       courses,
-      "getCourseStructureDocument"
-    );
+      'getCourseStructureDocument'
+    )
 
-    let test = await courses.getCourseStructureDocument(xmlValid);
+    const test = await courses.getCourseStructureDocument(xmlValid)
 
-    expect(getCourseStructureDocumentSpy).to.be.calledOnce;
-    expect(getCourseStructureDocumentSpy).to.not.throw();
-    expect(test).to.not.be.empty;
-  });
+    expect(getCourseStructureDocumentSpy).to.be.calledOnce
+    expect(getCourseStructureDocumentSpy).to.not.throw()
+    expect(test).to.not.be.empty
+  })
 
-  it("validateSchema returns true if input is valid", async function() {
-    let validateSchemaSpy = sinon.spy(courses, "validateSchema");
+  it('validateSchema returns true if input is valid', async function () {
+    const validateSchemaSpy = sinon.spy(courses, 'validateSchema')
 
-    let test = await courses.validateSchema(documentValid);
+    const test = await courses.validateSchema(documentValid)
 
-    expect(validateSchemaSpy).to.be.calledOnce;
-    expect(validateSchemaSpy).to.not.throw();
-    expect(test).to.eql(null);
-  });
+    expect(validateSchemaSpy).to.be.calledOnce
+    expect(validateSchemaSpy).to.not.throw()
+    expect(test).to.eql(null)
+  })
 
-  it("validateSchema throws if input is invalid", async function() {
-    let validateSchemaSpy = sinon.spy(courses, "validateSchema");
+  it('validateSchema throws if input is invalid', async function () {
+    const validateSchemaSpy = sinon.spy(courses, 'validateSchema')
 
     try {
-      await courses.validateSchema(documentInvalid);
-      assert.fail(error);
+      await courses.validateSchema(documentInvalid)
+      assert.fail(error)
     } catch (ex) {
-      function error() {
+      function error () {
         throw Boom.internal(
           `Failed to validate course structure against schema: ${ex}`
-        );
+        )
       }
 
-      expect(error).to.throw("Failed to validate course structure");
+      expect(error).to.throw('Failed to validate course structure')
     }
 
-    expect(validateSchemaSpy).to.be.calledOnce;
-  });
+    expect(validateSchemaSpy).to.be.calledOnce
+  })
 
-  it("storeCourseContent returns null if input is valid (isZip is true)", async function() {
-    let storeCourseContentSpy = sinon.spy(courses, "storeCourseContent");
+  it('storeCourseContent returns null if input is valid (isZip is true)', async function () {
+    const storeCourseContentSpy = sinon.spy(courses, 'storeCourseContent')
 
-    let test = await courses.storeCourseContent(true, zip, "", "");
+    const test = await courses.storeCourseContent(true, zip, '', '')
 
-    expect(storeCourseContentSpy).to.be.calledOnce;
-    expect(test).to.eql(null);
-  });
+    expect(storeCourseContentSpy).to.be.calledOnce
+    expect(test).to.eql(null)
+  })
 
-  it("storeCourseContent throws if input is valid (isZip is true)", async function() {
-    let badZip = {
-      entryData: function() {
-        throw new Error();
-      },
-    };
+  it('storeCourseContent throws if input is valid (isZip is true)', async function () {
+    const badZip = {
+      entryData: function () {
+        throw new Error()
+      }
+    }
 
-    let storeCourseContentSpy = sinon.spy(courses, "storeCourseContent");
+    const storeCourseContentSpy = sinon.spy(courses, 'storeCourseContent')
 
     try {
-      await courses.storeCourseContent(true, badZip, "", "");
-      assert.fail(error);
+      await courses.storeCourseContent(true, badZip, '', '')
+      assert.fail(error)
     } catch (ex) {
-      function error() {
-        throw Boom.internal(new Error(`Failed to store course content: ${ex}`));
+      function error () {
+        throw Boom.internal(new Error(`Failed to store course content: ${ex}`))
       }
 
-      expect(error).to.throw("Failed to store");
+      expect(error).to.throw('Failed to store')
     }
 
-    expect(storeCourseContentSpy).to.be.calledOnce;
-  });
-});
+    expect(storeCourseContentSpy).to.be.calledOnce
+  })
+})
 
-describe("Validation functions for courses.js", function() {
+describe('Validation functions for courses.js', function () {
   // Begin inits.
   // Mocking several inputs and functions to ensure code can execute.
-  let element = {
-    attr: function() {
+  const element = {
+    attr: function () {
       return {
-        value: function() {
-          return "https://example.com";
-        },
-      };
+        value: function () {
+          return 'https://example.com'
+        }
+      }
     },
-    childNodes: function() {
+    childNodes: function () {
       return [
         {
-          attr: function() {
+          attr: function () {
             return {
-              value: function() {
-                return "https://example.com";
-              },
-            };
+              value: function () {
+                return 'https://example.com'
+              }
+            }
           },
-          get: function() {
+          get: function () {
             return {
-              childNodes: function() {
+              childNodes: function () {
                 return [
                   {
-                    attr: function() {
+                    attr: function () {
                       return {
-                        value: function() {
-                          return "https://example.com";
-                        },
-                      };
+                        value: function () {
+                          return 'https://example.com'
+                        }
+                      }
                     },
-                    map: function() {
-                      return "1234";
+                    map: function () {
+                      return '1234'
                     },
-                    text: function() {
-                      return "abc";
-                    },
-                  },
-                ];
+                    text: function () {
+                      return 'abc'
+                    }
+                  }
+                ]
               },
-              text: function() {
-                return "abc";
-              },
-            };
+              text: function () {
+                return 'abc'
+              }
+            }
           },
-          name: function() {
-            return "au";
-          },
-        },
-      ];
+          name: function () {
+            return 'au'
+          }
+        }
+      ]
     },
-    get: function() {
+    get: function () {
       return {
-        text: function() {
-          return "";
-        },
-      };
+        text: function () {
+          return ''
+        }
+      }
     },
-    test: true,
-  };
-  let lmsIdHelper = {
+    test: true
+  }
+  const lmsIdHelper = {
     auIndex: 0,
     blockIndex: 0,
-    prefix: "prefix",
-  };
-  let objectiveMap = {
-    test: true,
-  };
-  let duplicateCheck = {
+    prefix: 'prefix'
+  }
+  const objectiveMap = {
+    test: true
+  }
+  const duplicateCheck = {
     aus: {
-      "https://example.com": false,
+      'https://example.com': false
     },
     blocks: {
-      "https://example.com": false,
+      'https://example.com': false
+    }
+  }
+  const parents = {
+    map: function () {
+      return {}
     },
-  };
-  let parents = {
-    map: function() {
-      return {};
+    pop: function () {
+      return {}
     },
-    pop: function() {
-      return {};
-    },
-    push: function() {
-      return {};
-    },
-  };
-  let document = {
-    root: function() {
+    push: function () {
+      return {}
+    }
+  }
+  const document = {
+    root: function () {
       return {
-        childNodes: function() {
+        childNodes: function () {
           return [
             {
-              attr: function() {
+              attr: function () {
                 return {
-                  value: function() {
-                    return "https://example.com";
-                  },
-                };
+                  value: function () {
+                    return 'https://example.com'
+                  }
+                }
               },
-              get: function() {
+              get: function () {
                 return {
-                  childNodes: function() {
+                  childNodes: function () {
                     return [
                       {
-                        attr: function() {
+                        attr: function () {
                           return {
-                            value: function() {
-                              return "https://example.com";
-                            },
-                          };
+                            value: function () {
+                              return 'https://example.com'
+                            }
+                          }
                         },
-                        map: function() {
-                          return "1234";
+                        map: function () {
+                          return '1234'
                         },
-                        text: function() {
-                          return "abc";
-                        },
-                      },
-                    ];
+                        text: function () {
+                          return 'abc'
+                        }
+                      }
+                    ]
                   },
-                  text: function() {
-                    return "abc";
-                  },
-                };
+                  text: function () {
+                    return 'abc'
+                  }
+                }
               },
-              name: function() {
-                return "au";
-              },
-            },
-          ];
+              name: function () {
+                return 'au'
+              }
+            }
+          ]
         },
-        get: function() {
+        get: function () {
           return {
-            attr: function() {
+            attr: function () {
               return {
-                value: function() {
-                  return "https://example.com";
-                },
-              };
+                value: function () {
+                  return 'https://example.com'
+                }
+              }
             },
-            childNodes: function() {
+            childNodes: function () {
               return [
                 {
-                  attr: function() {
+                  attr: function () {
                     return {
-                      value: function() {
-                        return "https://example.com";
-                      },
-                    };
+                      value: function () {
+                        return 'https://example.com'
+                      }
+                    }
                   },
-                  get: function() {
+                  get: function () {
                     return {
-                      childNodes: function() {
+                      childNodes: function () {
                         return {
-                          map: function() {
-                            return "1234";
-                          },
-                        };
-                      },
-                    };
+                          map: function () {
+                            return '1234'
+                          }
+                        }
+                      }
+                    }
                   },
-                  name: function() {
-                    return "objective";
-                  },
-                },
-              ];
+                  name: function () {
+                    return 'objective'
+                  }
+                }
+              ]
             },
-            get: function() {
-              return {};
+            get: function () {
+              return {}
             },
-            test: true,
-          };
+            test: true
+          }
         },
-        test: true,
-      };
-    },
-  };
-  let lmsId = "1234";
+        test: true
+      }
+    }
+  }
+  const lmsId = '1234'
   // End inits.
 
-  afterEach(function() {
-    sinon.restore();
-  });
+  afterEach(function () {
+    sinon.restore()
+  })
 
-  it("validateIRI returns true with valid input", function() {
-    let validateIRISpy = sinon.spy(courses, "validateIRI");
+  it('validateIRI returns true with valid input', function () {
+    const validateIRISpy = sinon.spy(courses, 'validateIRI')
 
-    let test = courses.validateIRI("https://example.com");
+    const test = courses.validateIRI('https://example.com')
 
-    expect(validateIRISpy.calledOnceWithExactly("https://example.com")).to.be
-      .true;
-    expect(test).to.eql(true);
-  });
+    expect(validateIRISpy.calledOnceWithExactly('https://example.com')).to.be
+      .true
+    expect(test).to.eql(true)
+  })
 
-  it("validateIRI throws with invalid input", function() {
-    let validateIRISpy = sinon.spy(courses, "validateIRI");
+  it('validateIRI throws with invalid input', function () {
+    const validateIRISpy = sinon.spy(courses, 'validateIRI')
 
     try {
-      courses.validateIRI("Fail");
-      assert.fail(error);
+      courses.validateIRI('Fail')
+      assert.fail(error)
     } catch (ex) {
-      function error() {
-        throw new Error("Invalid IRI: Fail");
+      function error () {
+        throw new Error('Invalid IRI: Fail')
       }
 
-      expect(error).to.throw("Invalid IRI");
+      expect(error).to.throw('Invalid IRI')
     }
 
-    expect(validateIRISpy.calledOnceWithExactly("Fail")).to.be.true;
-  });
+    expect(validateIRISpy.calledOnceWithExactly('Fail')).to.be.true
+  })
 
-  it("validateAU returns result with valid input", function() {
-    let validateAUSpy = sinon.spy(courses, "validateAU");
+  it('validateAU returns result with valid input', function () {
+    const validateAUSpy = sinon.spy(courses, 'validateAU')
 
-    let test = courses.validateAU(
+    const test = courses.validateAU(
       element,
       lmsIdHelper,
       objectiveMap,
       duplicateCheck,
       parents
-    );
+    )
 
-    expect(validateAUSpy).to.be.calledOnce;
-    expect(test).to.not.be.empty;
-  });
+    expect(validateAUSpy).to.be.calledOnce
+    expect(test).to.not.be.empty
+  })
 
-  it.skip("validateBlock returns result with valid input", function() {
-    let validateBlockSpy = sinon.spy(courses, "validateBlock");
+  it.skip('validateBlock returns result with valid input', function () {
+    const validateBlockSpy = sinon.spy(courses, 'validateBlock')
 
-    let test = courses.validateBlock(
+    const test = courses.validateBlock(
       element,
       lmsIdHelper,
       objectiveMap,
       duplicateCheck,
       parents
-    );
+    )
 
-    expect(validateBlockSpy).to.be.calledOnce;
-    expect(test).to.not.be.empty;
-  });
+    expect(validateBlockSpy).to.be.calledOnce
+    expect(test).to.not.be.empty
+  })
 
-  it("validateAndReduceStructure returns result with valid input", function() {
-    let validateAndReduceStructureSpy = sinon.spy(
+  it('validateAndReduceStructure returns result with valid input', function () {
+    const validateAndReduceStructureSpy = sinon.spy(
       courses,
-      "validateAndReduceStructure"
-    );
+      'validateAndReduceStructure'
+    )
 
-    let test = courses.validateAndReduceStructure(document, lmsId);
+    const test = courses.validateAndReduceStructure(document, lmsId)
 
-    expect(validateAndReduceStructureSpy).to.be.calledOnce;
-    expect(test).to.not.be.empty;
-  });
+    expect(validateAndReduceStructureSpy).to.be.calledOnce
+    expect(test).to.not.be.empty
+  })
 
-  it("flattenAUs returns a list from a tree if input is type au", function() {
-    let tree = [
+  it('flattenAUs returns a list from a tree if input is type au', function () {
+    const tree = [
       {
-        type: "au",
-      },
-    ];
-    let list = [];
-    let result = [
+        type: 'au'
+      }
+    ]
+    const list = []
+    const result = [
       {
         auIndex: 0,
-        type: "au",
-      },
-    ];
-    let flattenAUsSpy = sinon.spy(courses, "flattenAUs");
+        type: 'au'
+      }
+    ]
+    const flattenAUsSpy = sinon.spy(courses, 'flattenAUs')
 
-    courses.flattenAUs(tree, list);
+    courses.flattenAUs(tree, list)
 
-    expect(flattenAUsSpy).to.be.calledOnce;
-    expect(list).to.eql(result);
-  });
+    expect(flattenAUsSpy).to.be.calledOnce
+    expect(list).to.eql(result)
+  })
 
-  it("flattenAUs is called recursively if input is type block", function() {
-    let tree = [
+  it('flattenAUs is called recursively if input is type block', function () {
+    const tree = [
       {
         children: [
           {
-            type: "au",
-          },
+            type: 'au'
+          }
         ],
-        type: "block",
-      },
-    ];
-    let list = [];
-    let result = [
+        type: 'block'
+      }
+    ]
+    const list = []
+    const result = [
       {
         auIndex: 0,
-        type: "au",
-      },
-    ];
-    let flattenAUsSpy = sinon.spy(courses, "flattenAUs");
+        type: 'au'
+      }
+    ]
+    const flattenAUsSpy = sinon.spy(courses, 'flattenAUs')
 
-    courses.flattenAUs(tree, list);
+    courses.flattenAUs(tree, list)
 
-    expect(flattenAUsSpy).to.be.calledOnce;
-    expect(list).to.eql(result);
-  });
+    expect(flattenAUsSpy).to.be.calledOnce
+    expect(list).to.eql(result)
+  })
 
-  it("getCourseDir returns a string including its inputs", function() {
-    let tenantId = "tenantId";
-    let courseId = "1234";
-    let getCourseDirSpy = sinon.spy(courses, "getCourseDir");
+  it('getCourseDir returns a string including its inputs', function () {
+    const tenantId = 'tenantId'
+    const courseId = '1234'
+    const getCourseDirSpy = sinon.spy(courses, 'getCourseDir')
 
-    let test = courses.getCourseDir(tenantId, courseId);
+    const test = courses.getCourseDir(tenantId, courseId)
 
-    expect(getCourseDirSpy).to.be.calledOnce;
-    expect(test).to.include("tenantId");
-    expect(test).to.include("1234");
-  });
-});
+    expect(getCourseDirSpy).to.be.calledOnce
+    expect(test).to.include('tenantId')
+    expect(test).to.include('1234')
+  })
+})
