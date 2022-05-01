@@ -1,8 +1,8 @@
-const { v4: uuidv4 } = require('uuid')
-const Boom = require('@hapi/boom')
-const Wreck = require('@hapi/wreck')
+const { v4: uuidv4 } = require('uuid');
+const Boom = require('@hapi/boom');
+const Wreck = require('@hapi/wreck');
 
-let RegistrationHelpers
+let RegistrationHelpers;
 
 module.exports = RegistrationHelpers = {
 

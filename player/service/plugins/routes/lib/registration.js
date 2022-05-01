@@ -61,11 +61,11 @@ module.exports = Registration = {
   },
 
   getCourse: async (txn, tenantId, courseId) => {
-      await txn.first('*').from('courses').queryContext({ jsonCols: ['metadata', 'structure'] }).where({ tenantId, id: courseId });
+    await txn.first('*').from('courses').queryContext({ jsonCols: ['metadata', 'structure'] }).where({ tenantId, id: courseId })
   },
 
   getCourseAUs: async (txn, tenantId, courseId) => {
-      await txn.select('*').from('courses_aus').queryContext({ jsonCols: ['metadata'] }).where({ tenantId, courseId });
+    await txn.select('*').from('courses_aus').queryContext({ jsonCols: ['metadata'] }).where({ tenantId, courseId })
   },
 
   load: async (tenantId, registrationId, db, loadAus = true) => {
@@ -88,36 +88,35 @@ module.exports = Registration = {
     return registration
   },
 
-  loadRegistration: async (tenantId, registrationId, db) => 
-  {
+  loadRegistration: async (tenantId, registrationId, db) => {
     await db
-        .first('*')
-        .queryContext({ jsonCols: ['actor', 'metadata'] })
-        .from('registrations')
-        .where({tenantId})
-        .andWhere(function () {
-            where('id', registrationId).orWhere('code', registrationId.toString())
-        }
-        )
-    },
-  loadRegistrationAus: async (tenantId, registrationId, db, registration) => 
-    {await db
-        .select(
-            'has_been_attempted',
-            'duration_normal',
-            'duration_browse',
-            'duration_review',
-            'is_passed',
-            'is_completed',
-            'is_waived',
-            'waived_reason',
-            'is_satisfied',
-            'metadata'
-        )
-        .from('registrations_courses_aus')
-        .where({ tenantId, registrationId: registration.id })
-        .queryContext({ jsonCols: ['metadata'] })
-    },
+      .first('*')
+      .queryContext({ jsonCols: ['actor', 'metadata'] })
+      .from('registrations')
+      .where({ tenantId })
+      .andWhere(function () {
+        where('id', registrationId).orWhere('code', registrationId.toString())
+      }
+      )
+  },
+  loadRegistrationAus: async (tenantId, registrationId, db, registration) => {
+    await db
+      .select(
+        'has_been_attempted',
+        'duration_normal',
+        'duration_browse',
+        'duration_review',
+        'is_passed',
+        'is_completed',
+        'is_waived',
+        'waived_reason',
+        'is_satisfied',
+        'metadata'
+      )
+      .from('registrations_courses_aus')
+      .where({ tenantId, registrationId: registration.id })
+      .queryContext({ jsonCols: ['metadata'] })
+  },
 
   loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
     let queryResult
@@ -144,34 +143,34 @@ module.exports = Registration = {
     return { regCourseAu, registration, courseAu }
   },
 
-  getQueryResult: async (txn, registrationId, auIndex, tenantId) => { 
+  getQueryResult: async (txn, registrationId, auIndex, tenantId) => {
     await txn
-        .first('*')
-        .from('registrations_courses_aus')
-        .leftJoin('registrations', 'registrations_courses_aus.registration_id', 'registrations.id')
-        .leftJoin('courses_aus', 'registrations_courses_aus.course_au_id', 'courses_aus.id')
-        .where(
+      .first('*')
+      .from('registrations_courses_aus')
+      .leftJoin('registrations', 'registrations_courses_aus.registration_id', 'registrations.id')
+      .leftJoin('courses_aus', 'registrations_courses_aus.course_au_id', 'courses_aus.id')
+      .where(
         {
-            'registrations_courses_aus.tenant_id': tenantId,
-            'courses_aus.au_index': auIndex
+          'registrations_courses_aus.tenant_id': tenantId,
+          'courses_aus.au_index': auIndex
         }
-        )
-        .andWhere(function () {
+      )
+      .andWhere(function () {
         where('registrations.id', registrationId).orWhere('registrations.code', registrationId.toString())
-        })
-        .queryContext(
+      })
+      .queryContext(
         {
-            jsonCols: [
+          jsonCols: [
             'registrations_courses_aus.metadata',
             'registrations.actor',
             'registrations.metadata',
             'courses_aus.metadata'
-            ]
+          ]
         }
-        )
-        .forUpdate()
-        .options({ nestTables: true })
-    },
+      )
+      .forUpdate()
+      .options({ nestTables: true })
+  },
   interpretMoveOn: async (registration, { auToSetSatisfied, sessionCode, lrsWreck }) => {
     const moveOn = registration.metadata.moveOn
 
@@ -182,6 +181,7 @@ module.exports = Registration = {
     // and nested blocks
     //
     const satisfiedStTemplate = Registration.templateToString(registration, sessionCode)
+
     if (moveOn.satisfied) {
       return
     }
@@ -216,13 +216,15 @@ module.exports = Registration = {
     return satisfiedStTemplate
   },
 
-  retrieveRegistrationDataAsString: async (registration, lrsWreck) => await Registration.interpretMoveOn(
-    registration,
-    {
-      sessionCode: uuidv4(),
-      lrsWreck
-    }
-  ),
+  retrieveRegistrationDataAsString: async (registration, lrsWreck) => {
+    await Registration.interpretMoveOn(
+      registration,
+      {
+        sessionCode: uuidv4(),
+        lrsWreck
+      }
+    )
+  },
 
   parseRegistrationData: async (registration, lrsWreck) => {
     try {
@@ -246,19 +248,19 @@ module.exports = Registration = {
   },
 
   updateCourseAUmap: async (txn, tenantId, registrationId, courseAUs) => {
-      await txn('registrations_courses_aus').insert(
-        courseAUs.map(
-            (ca) => ({
-                tenantId,
-                registrationId,
-                course_au_id: ca.id,
-                metadata: JSON.stringify({
-                version: 1,
-                moveOn: ca.metadata.moveOn
-                }),
-                is_satisfied: ca.metadata.moveOn === 'NotApplicable'
-            })
-        )
+    await txn('registrations_courses_aus').insert(
+      courseAUs.map(
+        (ca) => ({
+          tenantId,
+          registrationId,
+          course_au_id: ca.id,
+          metadata: JSON.stringify({
+            version: 1,
+            moveOn: ca.metadata.moveOn
+          }),
+          is_satisfied: ca.metadata.moveOn === 'NotApplicable'
+        })
+      )
     )
-    }
+  }
 }
