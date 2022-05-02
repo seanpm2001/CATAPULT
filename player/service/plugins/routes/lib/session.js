@@ -13,38 +13,40 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
-// not needed acorrding to liner:      'use strict';
+// not needed according to linter:      'use strict';
 
-const Boom = require('@hapi/boom')
-const Wreck = require('@hapi/wreck')
-const { v4: uuidv4 } = require('uuid')
+const Boom = require('@hapi/boom');
+const Wreck = require('@hapi/wreck');
+const { v4: uuidv4 } = require('uuid');
 
-let Session
+let Session;
 
 module.exports = Session = {
 // Param db was originally desctructered aka {db}, does it need to be?
 // causing tests to fail, also removing tenantId, its not used
   load: async (sessionId, db) => {
     try {
-      return await Session.getSession(sessionId, db)
+      return await Session.getSession(sessionId, db);
     } catch (ex) {
-      throw new Error(`Failed to select session: ${ex}`)
+      throw new Error(`Failed to select session: ${ex}`);
     }
   },
 
-  getSession: async (sessionId, db) => await db
-    .first('*')
-    .from('sessions')
-    .where((builder) => {
-      builder
-        .where('sessions.id', sessionId)
-        .orWhere('sessions.code', sessionId.toString()
-        )
-    })
-    .queryContext({ jsonCols: ['context_template'] }),
+  getSession: async (sessionId, db) => {
+    await db
+      .first('*')
+      .from('sessions')
+      .where((builder) => {
+        builder
+          .where('sessions.id', sessionId)
+          .orWhere('sessions.code', sessionId.toString()
+          )
+      })
+      .queryContext({ jsonCols: ['context_template'] });
+  },
 
   loadForChange: async (txn, sessionId, tenantId) => {
-    const queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId)
+    const queryResult = await Session.tryGetQueryResult(txn, sessionId, tenantId);
 
     try {
       const {
@@ -52,104 +54,100 @@ module.exports = Session = {
         registrationsCoursesAus: regCourseAu,
         registrations: registration,
         coursesAus: courseAu
-      } = queryResult
+      } = queryResult;
 
-      regCourseAu.courseAu = courseAu
+      regCourseAu.courseAu = courseAu;
 
-      return { session, regCourseAu, registration, courseAu }
+      return { session, regCourseAu, registration, courseAu };
     } catch {
-      await txn.rollback()
-      throw Boom.notFound(`session: ${sessionId}`)
+      await txn.rollback();
+      throw Boom.notFound(`session: ${sessionId}`);
     }
   },
 
   tryGetQueryResult: async (txn, sessionId, tenantId) => {
     try {
-      return await Session.getQueryResult(txn, sessionId, tenantId)
+      return await Session.getQueryResult(txn, sessionId, tenantId);
     } catch (ex) {
-      await txn.rollback()
-      throw new Error(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`)
+      await txn.rollback();
+      throw new Error(`Failed to select session, registration course AU, registration and course AU for update: ${ex}`);
     }
   },
 
-  getQueryResult: async (txn, sessionId, tenantId) => await txn
-    .first('*')
-    .from('sessions')
-    .leftJoin('registrations_courses_aus', 'sessions.registrations_courses_aus_id', 'registrations_courses_aus.id')
-    .leftJoin('registrations', 'registrations_courses_aus.registration_id', 'registrations.id')
-    .leftJoin('courses_aus', 'registrations_courses_aus.course_au_id', 'courses_aus.id')
-    .where({ 'sessions.tenant_id': tenantId })
-    .andWhere((finder) => {
-      finder
-        .where('sessions.id', sessionId)
-        .orWhere('sessions.code', sessionId.toString())
-    })
-    .queryContext({
-      jsonCols: [
-        'registrations_courses_aus.metadata',
-        'registrations.actor',
-        'registrations.metadata',
-        'courses_aus.metadata',
-        'sessions.context_template'
-      ]
-    })
-    .forUpdate()
-    .options({ nestTables: true }),
+  getQueryResult: async (txn, sessionId, tenantId) => {
+    await txn
+      .first('*')
+      .from('sessions')
+      .leftJoin('registrations_courses_aus', 'sessions.registrations_courses_aus_id', 'registrations_courses_aus.id')
+      .leftJoin('registrations', 'registrations_courses_aus.registration_id', 'registrations.id')
+      .leftJoin('courses_aus', 'registrations_courses_aus.course_au_id', 'courses_aus.id')
+      .where({ 'sessions.tenant_id': tenantId })
+      .andWhere((finder) => {
+        finder
+          .where('sessions.id', sessionId)
+          .orWhere('sessions.code', sessionId.toString())
+      })
+      .queryContext({
+        jsonCols: [
+          'registrations_courses_aus.metadata',
+          'registrations.actor',
+          'registrations.metadata',
+          'courses_aus.metadata',
+          'sessions.context_template'
+        ]
+      })
+      .forUpdate()
+      .options({ nestTables: true });
+  },
 
   abandon: async (sessionId, tenantId, by, { db, lrsWreck }) => {
-    const txn = await db.transaction()
+    const txn = await db.transaction();
 
     let session,
       regCourseAu,
       registration,
-      courseAu
+      courseAu;
 
     try {
-      ({
-        session,
-        regCourseAu,
-        registration,
-        courseAu
-      } = await Session.loadForChange(txn, sessionId, tenantId, courseAu))
+      ({ session, regCourseAu, registration, courseAu } = await Session.loadForChange(txn, sessionId, tenantId, courseAu));
     } catch (ex) {
-      await txn.rollback()
-      throw Boom.internal(ex)
+      await txn.rollback();
+      throw Boom.internal(ex);
     }
 
-    let stResponse,
-      stResponseBody
+    let stResponse, stResponseBody;
 
-    Session.determineSessionTerminated(session, txn)
-    Session.determineSessionAbandoned(session, txn)
+    Session.determineSessionTerminated(session, txn);
+    Session.determineSessionAbandoned(session, txn);
 
     const durationSeconds = Session.initializeDuration(session);
 
-    [stResponse, stResponseBody] = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn)
+    [stResponse, stResponseBody] = await Session.retrieveResponse(durationSeconds, session, regCourseAu, registration, lrsWreck, txn);
 
-    await Session.checkStatusCode(txn, stResponse, stResponseBody)
+    await Session.checkStatusCode(txn, stResponse, stResponseBody);
 
-    await Session.txnUpdate(session, tenantId, txn, by)
+    await Session.txnUpdate(session, tenantId, txn, by);
 
-    await txn.commit()
+    await txn.commit();
   },
 
   tryGetSessionInfo: async (txn, sessionId, tenantId) => {
     try {
-      return await Session.loadForChange(txn, sessionId, tenantId)
+      return await Session.loadForChange(txn, sessionId, tenantId);
     } catch (ex) {
-      await txn.rollback()
-      throw Boom.internal(ex)
+      await txn.rollback();
+      throw Boom.internal(ex);
     }
   },
 
   initializeDuration (session) {
-    let durationSeconds
+    let durationSeconds;
 
     if (session.is_initialized) {
-      durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000
+      durationSeconds = (new Date().getTime() - session.initialized_at.getTime()) / 1000;
     }
 
-    return durationSeconds
+    return durationSeconds;
   },
 
   determineSessionTerminated: async (session, txn) => {
@@ -160,7 +158,7 @@ module.exports = Session = {
       // abandon it, but in the case that a terminated happens in that time
       // then there is no reason to abandon the session so just return
       //
-      await txn.rollback()
+      await txn.rollback();
     }
   },
   determineSessionAbandoned: async (session, txn) => {
@@ -170,13 +168,13 @@ module.exports = Session = {
       // isn't really a reason to error, better to just return and it is
       // expected that more than one abandoned would not be recorded
       //
-      await txn.rollback()
+      await txn.rollback();
     }
   },
 
   retrieveResponse: async (durationSeconds, session, regCourseAu, registration, lrsWreck, txn) => {
     let stResponse,
-      stResponseBody
+      stResponseBody;
 
     try {
       stResponse = await lrsWreck.request(
@@ -219,28 +217,28 @@ module.exports = Session = {
         }
       )
 
-      stResponseBody = await Wreck.read(stResponse, { json: true })
+      stResponseBody = await Wreck.read(stResponse, { json: true });
 
-      return [stResponse, stResponseBody]
+      return [stResponse, stResponseBody];
     } catch (ex) {
-      await txn.rollback()
-      throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`))
+      await txn.rollback();
+      throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`));
     }
   },
 
   checkStatusCode: async (txn, stResponse, stResponseBody) => {
     if (stResponse.statusCode !== 200) {
-      await txn.rollback()
-      throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`))
+      await txn.rollback();
+      throw Boom.internal(new Error(`Failed to store abandoned statement (${stResponse.statusCode}): ${stResponseBody}`));
     }
   },
 
   txnUpdate: async (session, tenantId, txn, by) => {
     try {
-      await txn('sessions').update({ is_abandoned: true, abandoned_by: by }).where({ id: session.id, tenantId })
+      await txn('sessions').update({ is_abandoned: true, abandoned_by: by }).where({ id: session.id, tenantId });
     } catch (ex) {
-      await txn.rollback()
-      throw Boom.internal(`Failed to update session: ${ex}`)
+      await txn.rollback();
+      throw Boom.internal(`Failed to update session: ${ex}`);
     }
   }
 }

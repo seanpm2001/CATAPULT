@@ -14,15 +14,15 @@
     limitations under the License.
 */
 
-const Boom = require('@hapi/boom')
-const Requirements = require('@cmi5/requirements')
+const Boom = require('@hapi/boom');
+const Requirements = require('@cmi5/requirements');
 
 module.exports = {
   buildViolatedReqId: (violatedReqId, msg, boomType = 'forbidden') => {
     if (!Requirements[violatedReqId]) {
-      throw new Error(`Unrecognized requirement id: ${violatedReqId}`)
+      throw new Error(`Unrecognized requirement id: ${violatedReqId}`);
     }
 
-    return Boom[boomType](`${violatedReqId} - ${Requirements[violatedReqId].txt} (${msg})`, { violatedReqId })
+    return Boom[boomType](`${violatedReqId} - ${Requirements[violatedReqId].txt} (${msg})`, { violatedReqId });
   }
 }

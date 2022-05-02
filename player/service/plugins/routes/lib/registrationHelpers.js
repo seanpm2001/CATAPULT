@@ -15,64 +15,64 @@ module.exports = RegistrationHelpers = {
   }),
 
   tryParseTemplate: (satisfiedStTemplate) => {
-    let statement
+    let statement;
 
     try {
-      statement = JSON.parse(satisfiedStTemplate)
+      statement = JSON.parse(satisfiedStTemplate);
     } catch (ex) {
-      throw new Error(`Failed to parse statement template: ${ex}`)
+      throw new Error(`Failed to parse statement template: ${ex}`);
     }
 
-    return statement
+    return statement;
   },
 
   assignStatementValues: (node, statement) => {
-    statement.id = uuidv4()
-    statement.timestamp = new Date().toISOString()
+    statement.id = uuidv4();
+    statement.timestamp = new Date().toISOString();
     statement.object = {
       id: node.lmsId,
       definition: {
         type: node.type === 'block' ? 'https://w3id.org/xapi/cmi5/activitytype/block' : 'https://w3id.org/xapi/cmi5/activitytype/course'
       }
-    }
+    };
     statement.context.contextActivities.grouping = [
       {
         id: node.pubId
       }
-    ]
+    ];
   },
 
   nodeSatisfied: (node) => {
     if (node.satisfied) {
-      return true
+      return true;
     }
   },
 
   AUnodeSatisfied: async (node, auToSetSatisfied) => {
     if (node.type === 'au') {
       if (node.lmsId === auToSetSatisfied) {
-        node.satisfied = true
+        node.satisfied = true;
       }
 
-      return await node.satisfied
+      return await node.satisfied;
     }
   },
 
   loopThroughChildren: async (node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn) => {
-    let allChildrenSatisfied = true
+    let allChildrenSatisfied = true;
 
     for (const child of node.children) {
       if (!await RegistrationHelpers.isSatisfied(child, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)) {
-        allChildrenSatisfied = false
+        allChildrenSatisfied = false;
       }
     }
 
-    return allChildrenSatisfied
+    return allChildrenSatisfied;
   },
 
   retrieveResponse: async (lrsWreck, txn) => {
     let satisfiedStResponse,
-      satisfiedStResponseBody
+      satisfiedStResponseBody;
 
     try {
       satisfiedStResponse = await lrsWreck.request(
@@ -115,54 +115,54 @@ module.exports = RegistrationHelpers = {
         }
       )
 
-      satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, { json: true })
+      satisfiedStResponseBody = await Wreck.read(satisfiedStResponse, { json: true });
 
-      return [satisfiedStResponse, satisfiedStResponseBody]
+      return [satisfiedStResponse, satisfiedStResponseBody];
     } catch (ex) {
-      await txn.rollback()
-      throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`))
+      await txn.rollback();
+      throw Boom.internal(new Error(`Failed request to store abandoned statement: ${ex}`));
     }
   },
 
   checkStatusCode: (satisfiedStResponse, satisfiedStResponseBody) => {
     if (satisfiedStResponse.statusCode !== 200) {
-      throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`)
+      throw new Error(`Failed to store satisfied statement: ${satisfiedStResponse.statusCode} (${satisfiedStResponseBody})`);
     }
   },
 
   isSatisfied: async (node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn) => {
-    await RegistrationHelpers.nodeSatisfied(node)
+    await RegistrationHelpers.nodeSatisfied(node);
 
     if (RegistrationHelpers.AUnodeSatisfied(node, auToSetSatisfied)) {
-      node.satisfied = true
+      node.satisfied = true;
 
-      return node.satisfied
+      return node.satisfied;
     }
 
     // recursively check all children to see if they are satisfied
-    const allChildrenSatisfied = true
+    const allChildrenSatisfied = true;
 
-    RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn)
+    RegistrationHelpers.loopThroughChildren(node, auToSetSatisfied, satisfiedStTemplate, lrsWreck, txn);
 
     if (allChildrenSatisfied) {
-      node.satisfied = true
+      node.satisfied = true;
 
-      let statement
+      let statement;
 
-      statement = RegistrationHelpers.tryParseTemplate(satisfiedStTemplate)
+      statement = RegistrationHelpers.tryParseTemplate(satisfiedStTemplate);
 
-      RegistrationHelpers.assignStatementValues(node, statement)
+      RegistrationHelpers.assignStatementValues(node, statement);
 
-      let satisfiedStResponse, satisfiedStResponseBody
+      let satisfiedStResponse, satisfiedStResponseBody;
 
       // for tests to work, removed [] around these two. If program causes errors check here first, seems ok right now
-      satisfiedStResponse, satisfiedStResponseBody = await RegistrationHelpers.retrieveResponse(lrsWreck, txn)
+      satisfiedStResponse, satisfiedStResponseBody = await RegistrationHelpers.retrieveResponse(lrsWreck, txn);
 
-      await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody)
+      await RegistrationHelpers.checkStatusCode(satisfiedStResponse, satisfiedStResponseBody);
 
-      return true
+      return true;
     }
 
-    return false
+    return false;
   }
 }

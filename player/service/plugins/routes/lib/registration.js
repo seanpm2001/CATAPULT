@@ -11,21 +11,21 @@
     limitations under the License.
 */
 
-const RegistrationHelpers = require('./registrationHelpers.js')
-const { v4: uuidv4 } = require('uuid')
-const Boom = require('@hapi/boom')
+const RegistrationHelpers = require('./registrationHelpers.js');
+const { v4: uuidv4 } = require('uuid');
+const Boom = require('@hapi/boom');
 
-let Registration
+let Registration;
 
 module.exports = Registration = {
   create: async ({ tenantId, courseId, actor, code = uuidv4() }, db, lrsWreck, txn) => {
-    let registrationId, mapMoveOnChildren
+    let registrationId, mapMoveOnChildren;
 
     try {
       await db.transaction(
         async (txn) => {
-          const course = await Registration.getCourse(txn, tenantId, courseId)
-          const courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId)
+          const course = await Registration.getCourse(txn, tenantId, courseId);
+          const courseAUs = await Registration.getCourseAUs(txn, tenantId, courseId);
           const registration = {
             tenantId,
             code,
@@ -41,51 +41,51 @@ module.exports = Registration = {
                 children: course.structure.course.children.map(mapMoveOnChildren)
               }
             })
-          }
-          const regResult = await txn('registrations').insert(registration)
+          };
+          const regResult = await txn('registrations').insert(registration);
 
-          registrationId = registration.id = regResult[0]
+          registrationId = registration.id = regResult[0];
 
-          await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs)
+          await Registration.updateCourseAUmap(txn, tenantId, registrationId, courseAUs);
 
-          await Registration.parseRegistrationData(registration, lrsWreck)
+          await Registration.parseRegistrationData(registration, lrsWreck);
 
-          await Registration.updateMetadata(txn, registration, tenantId)
+          await Registration.updateMetadata(txn, registration, tenantId);
         }
       )
     } catch (ex) {
-      throw Boom.internal(new Error(`Failed to store registration: ${ex}`))
+      throw Boom.internal(new Error(`Failed to store registration: ${ex}`));
     }
 
-    return registrationId
+    return registrationId;
   },
 
   getCourse: async (txn, tenantId, courseId) => {
-    await txn.first('*').from('courses').queryContext({ jsonCols: ['metadata', 'structure'] }).where({ tenantId, id: courseId })
+    await txn.first('*').from('courses').queryContext({ jsonCols: ['metadata', 'structure'] }).where({ tenantId, id: courseId });
   },
 
   getCourseAUs: async (txn, tenantId, courseId) => {
-    await txn.select('*').from('courses_aus').queryContext({ jsonCols: ['metadata'] }).where({ tenantId, courseId })
+    await txn.select('*').from('courses_aus').queryContext({ jsonCols: ['metadata'] }).where({ tenantId, courseId });
   },
 
   load: async (tenantId, registrationId, db, loadAus = true) => {
-    let registration
+    let registration;
 
     try {
-      registration = await Registration.loadRegistration(tenantId, registrationId, db)
+      registration = await Registration.loadRegistration(tenantId, registrationId, db);
     } catch (ex) {
-      throw new Error(`Failed to load registration: ${ex}`)
+      throw new Error(`Failed to load registration: ${ex}`);
     }
 
     if (loadAus) {
       try {
-        registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration)
+        registration.aus = await Registration.loadRegistrationAus(tenantId, registrationId, db, registration);
       } catch (ex) {
-        throw new Error(`Failed to load registration AUs: ${ex}`)
+        throw new Error(`Failed to load registration AUs: ${ex}`);
       }
     }
 
-    return registration
+    return registration;
   },
 
   loadRegistration: async (tenantId, registrationId, db) => {
@@ -119,28 +119,28 @@ module.exports = Registration = {
   },
 
   loadAuForChange: async (txn, registrationId, auIndex, tenantId) => {
-    let queryResult
+    let queryResult;
 
     try {
-      queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId)
+      queryResult = await Registration.getQueryResult(txn, registrationId, auIndex, tenantId);
     } catch (ex) {
-      await txn.rollback()
-      throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`)
+      await txn.rollback();
+      throw new Error(`Failed to select registration course AU, registration and course AU for update: ${ex}`);
     }
 
     if (!queryResult) {
-      await txn.rollback()
-      throw Boom.notFound(`registration: ${registrationId}`)
+      await txn.rollback();
+      throw Boom.notFound(`registration: ${registrationId}`);
     }
     const {
       registrationsCoursesAus: regCourseAu,
       registrations: registration,
       coursesAus: courseAu
-    } = queryResult
+    } = queryResult;
 
-    regCourseAu.courseAu = courseAu
+    regCourseAu.courseAu = courseAu;
 
-    return { regCourseAu, registration, courseAu }
+    return { regCourseAu, registration, courseAu };
   },
 
   getQueryResult: async (txn, registrationId, auIndex, tenantId) => {
@@ -172,7 +172,7 @@ module.exports = Registration = {
       .options({ nestTables: true })
   },
   interpretMoveOn: async (registration, { auToSetSatisfied, sessionCode, lrsWreck }) => {
-    const moveOn = registration.metadata.moveOn
+    const moveOn = registration.metadata.moveOn;
 
     //
     // use a stringified value as the template which allows for parsing
@@ -180,12 +180,12 @@ module.exports = Registration = {
     // for multiple satisfied statements in the case of blocks in a course
     // and nested blocks
     //
-    const satisfiedStTemplate = Registration.templateToString(registration, sessionCode)
+    const satisfiedStTemplate = Registration.templateToString(registration, sessionCode);
 
     if (moveOn.satisfied) {
-      return
+      return;
     }
-    await RegistrationHelpers.isSatisfied(moveOn, { auToSetSatisfied, lrsWreck, satisfiedStTemplate })
+    await RegistrationHelpers.isSatisfied(moveOn, { auToSetSatisfied, lrsWreck, satisfiedStTemplate });
   },
 
   templateToString (registration, sessionCode) {
@@ -213,7 +213,7 @@ module.exports = Registration = {
       }
     })
 
-    return satisfiedStTemplate
+    return satisfiedStTemplate;
   },
 
   retrieveRegistrationDataAsString: async (registration, lrsWreck) => {
@@ -228,22 +228,22 @@ module.exports = Registration = {
 
   parseRegistrationData: async (registration, lrsWreck) => {
     try {
-      registration.actor = JSON.parse(registration.actor)
-      registration.metadata = JSON.parse(registration.metadata)
+      registration.actor = JSON.parse(registration.actor);
+      registration.metadata = JSON.parse(registration.metadata);
 
-      await Registration.retrieveRegistrationDataAsString(registration, lrsWreck)
+      await Registration.retrieveRegistrationDataAsString(registration, lrsWreck);
     } catch (ex) {
-      throw new Error(`Failed to interpret moveOn: ${ex}`)
+      throw new Error(`Failed to interpret moveOn: ${ex}`);
     }
 
-    return registration
+    return registration;
   },
 
   updateMetadata: async (txn, registration, tenantId) => {
     try {
-      return await txn('registrations').update({ metadata: JSON.stringify(registration.metadata) }).where({ tenantId, id: registration.id })
+      return await txn('registrations').update({ metadata: JSON.stringify(registration.metadata) }).where({ tenantId, id: registration.id });
     } catch (ex) {
-      throw new Error(`Failed to update registration metadata: ${ex}`)
+      throw new Error(`Failed to update registration metadata: ${ex}`);
     }
   },
 
