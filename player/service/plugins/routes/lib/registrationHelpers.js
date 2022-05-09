@@ -73,6 +73,7 @@ module.exports = RegistrationHelpers = {
   retrieveResponse: async (lrsWreck, txn) => {
     let satisfiedStResponse,
       satisfiedStResponseBody;
+    let registration, regCourseAu, session, durationSeconds;
 
     try {
       satisfiedStResponse = await lrsWreck.request(
