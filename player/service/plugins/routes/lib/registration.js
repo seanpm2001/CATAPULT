@@ -89,6 +89,8 @@ module.exports = Registration = {
   },
 
   loadRegistration: async (tenantId, registrationId, db) => {
+    let where;
+
     await db
       .first('*')
       .queryContext({ jsonCols: ['actor', 'metadata'] })
@@ -144,6 +146,8 @@ module.exports = Registration = {
   },
 
   getQueryResult: async (txn, registrationId, auIndex, tenantId) => {
+    let where;
+
     await txn
       .first('*')
       .from('registrations_courses_aus')
