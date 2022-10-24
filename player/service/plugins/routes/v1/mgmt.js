@@ -71,7 +71,7 @@ async function tryCreateTenant(app, code) {
 
 async function createTenant(app, code) {
   let tenant = { code: code };
-  let tenantDb = await app.db("tenants");
+  let tenantDb = app.db("tenants");
   let insertResult = await tenantDb.insert(tenant);
 
   tenant.id = insertResult[0];
