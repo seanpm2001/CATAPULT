@@ -37,10 +37,9 @@
     "iri": "^1.3.0",
     "iso8601-duration": "^1.3.0",
     "joi": "^17.4.1",
-    "knex": "^0.95.7",
+    "knex": "^3.10.0",
     "knex-stringcase": "^1.4.5",
     "libxmljs": "^0.19.8",
-    "mysql": "^2.18.1",
     "node-stream-zip": "^1.13.6",
     "uuid": "^9.0.1",
     "wait-port": "^0.2.9"
