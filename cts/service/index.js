@@ -15,6 +15,8 @@
 */
 "use strict";
 
+require('dotenv').config();
+
 const Hapi = require("@hapi/hapi"),
     H2o2 = require("@hapi/h2o2"),
     Inert = require("@hapi/inert"),
@@ -65,7 +67,7 @@ const provision = async () => {
             }
         };
 
-    await waitPort({host: "rdbms", port: 3306});
+    await waitPort({host: process.env.DB_HOST, port: 3306});
 
     const db = await require("./lib/db")();
 

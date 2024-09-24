@@ -16,13 +16,13 @@
 const Hoek = require("@hapi/hoek"),
     waitPort = require("wait-port"),
     {
-        MYSQL_HOST: HOST = "rdbms",
+        MYSQL_HOST: HOST = process.env.DB_HOST,
         MYSQL_HOST_FILE: HOST_FILE,
-        DATABASE_USER: USER = "catapult",
+        DATABASE_USER: USER = process.env.DB_USER,
         DATABASE_USER_FILE: USER_FILE,
-        DATABASE_USER_PASSWORD: PASSWORD = "quartz",
+        DATABASE_USER_PASSWORD: PASSWORD = process.env.DB_PASSWORD,
         DATABASE_USER_PASSWORD_FILE: PASSWORD_FILE,
-        DATABASE_NAME: DB = "catapult_player",
+        DATABASE_NAME: DB = process.env.DB_DATABASE_NAME,
         DATABASE_NAME_FILE: DB_FILE,
     } = process.env;
 
