@@ -15,7 +15,7 @@
 */
 "use strict";
 
-require('dotenv').config();
+// require('dotenv').config();
 
 const Hapi = require("@hapi/hapi"),
     H2o2 = require("@hapi/h2o2"),
