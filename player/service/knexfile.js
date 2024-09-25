@@ -16,21 +16,21 @@
 const Hoek = require("@hapi/hoek"),
     waitPort = require("wait-port"),
     {
-        MYSQL_HOST: HOST = process.env.DB_HOST,
+        MYSQL_HOST,
         MYSQL_HOST_FILE: HOST_FILE,
-        DATABASE_USER: USER = process.env.DB_USER,
+        DATABASE_USER,
         DATABASE_USER_FILE: USER_FILE,
-        DATABASE_USER_PASSWORD: PASSWORD = process.env.DB_PASSWORD,
+        DATABASE_USER_PASSWORD,
         DATABASE_USER_PASSWORD_FILE: PASSWORD_FILE,
-        DATABASE_NAME: DB = process.env.DB_DATABASE_NAME,
+        DATABASE_NAME,
         DATABASE_NAME_FILE: DB_FILE,
     } = process.env;
 
 module.exports = async () => {
-    const host = HOST_FILE ? fs.readFileSync(HOST_FILE) : HOST,
-        user = USER_FILE ? fs.readFileSync(USER_FILE) : USER,
-        password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE) : PASSWORD,
-        database = DB_FILE ? fs.readFileSync(DB_FILE) : DB;
+    const host = HOST_FILE ? fs.readFileSync(HOST_FILE) : MYSQL_HOST,
+        user = USER_FILE ? fs.readFileSync(USER_FILE) : DATABASE_USER,
+        password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE) : DATABASE_USER_PASSWORD,
+        database = DB_FILE ? fs.readFileSync(DB_FILE) : DATABASE_NAME;
 
     await waitPort({host, port: 3306});
 

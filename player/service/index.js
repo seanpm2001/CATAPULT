@@ -15,8 +15,6 @@
 */
 "use strict";
 
-// require('dotenv').config();
-
 const Hapi = require("@hapi/hapi"),
     H2o2 = require("@hapi/h2o2"),
     Inert = require("@hapi/inert"),
@@ -32,10 +30,11 @@ const Hapi = require("@hapi/hapi"),
         TOKEN_SECRET,
         API_KEY,
         API_SECRET,
-        PLAYER_API_ROOT
+        PLAYER_API_ROOT,
+        MYSQL_HOST
     } = process.env;
 
-const rootPath = (process.env.PLAYER_API_ROOT || "");
+const rootPath = (PLAYER_API_ROOT || "");
 
 const provision = async () => {
     const server = Hapi.server(
@@ -67,7 +66,7 @@ const provision = async () => {
             }
         };
 
-    await waitPort({host: process.env.DB_HOST, port: 3306});
+    await waitPort({host: MYSQL_HOST, port: 3306});
 
     const db = await require("./lib/db")();
 
