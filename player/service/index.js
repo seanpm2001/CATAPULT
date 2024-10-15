@@ -30,11 +30,10 @@ const Hapi = require("@hapi/hapi"),
         TOKEN_SECRET,
         API_KEY,
         API_SECRET,
-        PLAYER_API_ROOT,
-        MYSQL_HOST
+        PLAYER_API_ROOT
     } = process.env;
 
-const rootPath = (PLAYER_API_ROOT || "");
+const rootPath = (process.env.PLAYER_API_ROOT || "");
 
 const provision = async () => {
     const server = Hapi.server(
@@ -66,7 +65,8 @@ const provision = async () => {
             }
         };
 
-    await waitPort({host: MYSQL_HOST, port: 3306});
+    const DB_HOST = (process.env.DB_HOST || "rdbms");
+    await waitPort({host: DB_HOST, port: 3306});
 
     const db = await require("./lib/db")();
 
